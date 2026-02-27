@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Steam Games</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>Your Steam Games</h1>
+    </header>
+    <main>
+        {% if profile %}
+            <div class="profile">
+                <img src="{{ profile.avatarfull }}" alt="Avatar">
+                <h2>{{ profile.personaname }}</h2>
+                <p>Steam ID: {{ profile.steamid }}</p>
+            </div>
+        {% endif %}
+
+        {% if games %}
+            <ul>
+                {% for game in games %}
+                    <li>{{ game.name }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No games found.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

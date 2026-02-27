@@ -1,0 +1,38 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Flask App",
+			"type": "shell",
+			"command": "\"C:/Users/Jerush Vijay/AppData/Local/Programs/Python/Python314/python.exe\"",
+			"args": [
+				"app.py"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Flask App",
+			"type": "shell",
+			"command": "\"C:/Users/Jerush Vijay/AppData/Local/Programs/Python/Python314/python.exe\"",
+			"args": [
+				"app.py"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Flask App",
+			"type": "shell",
+			"command": "\"C:/Users/Jerush Vijay/AppData/Local/Programs/Python/Python314/python.exe\"",
+			"args": [
+				"\"app.py\""
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
