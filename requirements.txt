@@ -1,3 +1,5 @@
 Flask
 Flask-DotEnv
 requests
+beautifulsoup4==4.12.2
+python-steam-api==2.2.1

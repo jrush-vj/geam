@@ -19,14 +19,26 @@
             </div>
         {% endif %}
 
+        <h2>Your Games</h2>
         {% if games %}
             <ul>
                 {% for game in games %}
-                    <li>{{ game.name }}</li>
+                    <li>{{ game['name'] }}</li>
                 {% endfor %}
             </ul>
         {% else %}
             <p>No games found.</p>
+        {% endif %}
+
+        <h2>Family Shared Games</h2>
+        {% if family_games %}
+            <ul>
+                {% for game in family_games %}
+                    <li>{{ game['name'] }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No family shared games found.</p>
         {% endif %}
     </main>
 </body>

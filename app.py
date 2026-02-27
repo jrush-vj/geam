@@ -2,6 +2,8 @@ from flask import Flask, render_template, redirect, url_for, request, session
 from flask_dotenv import DotEnv
 import requests
 import urllib.parse
+from steam import Steam
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Replace with a secure key
@@ -47,17 +49,19 @@ def games():
     if not steam_id:
         return redirect(url_for('home'))
 
+    # Initialize Steam API
+    steam = Steam(STEAM_API_KEY)
+
     # Fetch user's games
-    games_url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={steam_id}&format=json"
-    games_response = requests.get(games_url)
-    games = games_response.json().get('response', {}).get('games', [])
+    user_games = steam.apps.get_owned_games(steam_id)
+
+    # Fetch family shared games (example logic, replace with actual API call if needed)
+    family_games = []  # Replace with actual logic to fetch family games
 
     # Fetch user profile
-    profile_url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
-    profile_response = requests.get(profile_url)
-    profile = profile_response.json().get('response', {}).get('players', [{}])[0]
+    user_profile = steam.users.get_user_summaries(steam_id)
 
-    return render_template('games.html', games=games, profile=profile)
+    return render_template('games.html', games=user_games, family_games=family_games, profile=user_profile)
 
 if __name__ == '__main__':
     app.run(debug=True)
