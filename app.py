@@ -2,7 +2,7 @@ import os
 from flask import Flask, render_template, redirect, url_for, request, session
 import requests
 import urllib.parse
-from steam import Steam
+from steam_web_api import Steam
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
