@@ -2,7 +2,7 @@ import os
 from flask import Flask, render_template, redirect, url_for, request, session
 import requests
 import urllib.parse
-from steam_web_api import Steam
+from steam import Steam
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
@@ -57,7 +57,7 @@ def games():
     steam = Steam(STEAM_API_KEY)
 
     # Fetch user's games
-    user_games = steam.apps.get_owned_games(steam_id)
+    user_games = steam.users.get_owned_games(steam_id)
 
     # Fetch family shared games (example logic, replace with actual API call if needed)
     family_games = []  # Replace with actual logic to fetch family games
