@@ -1,18 +1,22 @@
+import os
 from flask import Flask, render_template, redirect, url_for, request, session
-from flask_dotenv import DotEnv
 import requests
 import urllib.parse
 from steam_web_api import Steam
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Replace with a secure key
+app.secret_key = os.environ.get('SECRET_KEY', 'your_secret_key')
 
-# Load environment variables
-env = DotEnv()
-env.init_app(app)
+# Load environment variables from .env if available (local dev)
+try:
+    from flask_dotenv import DotEnv
+    env = DotEnv()
+    env.init_app(app)
+except ImportError:
+    pass
 
-STEAM_API_KEY = app.config.get('STEAM_API_KEY')
+STEAM_API_KEY = os.environ.get('STEAM_API_KEY') or app.config.get('STEAM_API_KEY')
 STEAM_OPENID_URL = "https://steamcommunity.com/openid/login"
 
 @app.route('/')
