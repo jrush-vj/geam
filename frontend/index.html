@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GEAM — Steam Profile Browser</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🎮 GEAM</h1>
+    <p class="subtitle">Steam Profile Browser</p>
+  </header>
+
+  <main>
+    <!-- Search bar -->
+    <section class="search-bar">
+      <input id="steam-id-input" type="text" placeholder="Enter Steam ID (e.g. 76561199168719281)" />
+      <button id="load-btn">Load Profile</button>
+    </section>
+
+    <!-- Error banner -->
+    <div id="error-banner" class="error-banner hidden"></div>
+
+    <!-- Profile card -->
+    <section id="profile-section" class="hidden">
+      <div class="profile-card">
+        <img id="profile-avatar" src="" alt="Avatar" />
+        <div class="profile-info">
+          <h2 id="profile-name"></h2>
+          <p id="profile-url"></p>
+          <p id="profile-country"></p>
+          <p id="profile-logoff"></p>
+          <span id="profile-state" class="status-badge"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <section id="tabs-section" class="hidden">
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="friends">Friends</button>
+        <button class="tab-btn" data-tab="recently-played">Recently Played</button>
+        <button class="tab-btn" data-tab="owned-games">Owned Games</button>
+        <button class="tab-btn" data-tab="search">Search Games</button>
+      </nav>
+
+      <!-- Friends tab -->
+      <div id="tab-friends" class="tab-content active">
+        <div id="friends-list" class="card-grid"></div>
+      </div>
+
+      <!-- Recently Played tab -->
+      <div id="tab-recently-played" class="tab-content">
+        <div id="recently-played-list" class="card-grid"></div>
+      </div>
+
+      <!-- Owned Games tab -->
+      <div id="tab-owned-games" class="tab-content">
+        <p id="owned-count" class="count-label"></p>
+        <div id="owned-games-list" class="card-grid"></div>
+      </div>
+
+      <!-- Search tab -->
+      <div id="tab-search" class="tab-content">
+        <div class="search-bar">
+          <input id="game-search-input" type="text" placeholder="Search for a game…" />
+          <button id="game-search-btn">Search</button>
+        </div>
+        <div id="search-results" class="card-grid"></div>
+        <!-- Game details panel -->
+        <div id="game-details-panel" class="hidden game-details-panel"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
