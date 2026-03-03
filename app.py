@@ -4,10 +4,9 @@ from steam_web_api import Steam
 
 # ======= API KEYS =======
 KEY = "C6915E5B9AA98A9B18AC84B20C7CE0ED"
-ACCESS_TOKEN = "76561199168719281"
+STEAM_ID = "76561199168719281"
 steam = Steam(KEY)
 
-STEAM_ID = "76561199168719281"
 
 def print_header(title):
     print("\n" + "="*60)
