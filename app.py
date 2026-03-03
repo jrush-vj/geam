@@ -70,23 +70,6 @@ def show_owned_games():
         hrs = round(g.get("playtime_forever",0)/60,2)
         print(f"{i}. {g.get('name')} — {hrs} hrs")
 
-def show_shared_games():
-    print_header("FAMILY / SHARED GAMES (INCLUDING OWNED)")
-    try:
-        data = steam.users.get_shared_games(STEAM_ID, ACCESS_TOKEN, include_owned=True)
-    except Exception as e:
-        print("Error fetching shared games.")
-        print("Make sure ACCESS_TOKEN is valid.")
-        return
-
-    total = data.get("game_count", 0)
-    games = data.get("games", [])
-    print(f"Total Shared + Owned Games: {total}\n")
-    games.sort(key=lambda x: x.get("playtime_forever",0), reverse=True)
-    for i, g in enumerate(games,1):
-        hrs = round(g.get("playtime_forever",0)/60,2)
-        print(f"{i}. {g.get('name')} — {hrs} hrs")
-
 def search_games():
     print_header("SEARCH GAMES")
     query = input("Enter game search term: ")
@@ -138,10 +121,8 @@ def main_menu():
         elif choice == "4":
             show_owned_games()
         elif choice == "5":
-            show_shared_games()
-        elif choice == "6":
             search_games()
-        elif choice == "7":
+        elif choice == "6":
             show_app_details()
         elif choice == "0":
             print("Goodbye!")
