@@ -1,19 +1,28 @@
 import os
 import datetime
+import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from steam_web_api import Steam
+from dotenv import load_dotenv
 
-# ======= API KEYS =======
-# Set STEAM_API_KEY environment variable (or create a backend/.env file)
-KEY = os.getenv("STEAM_API_KEY", "C6915E5B9AA98A9B18AC84B20C7CE0ED")
+load_dotenv()
+
+KEY = os.getenv("STEAM_API_KEY", "")
+DEFAULT_STEAM_ID = os.getenv("STEAM_ID", "")
+
 steam = Steam(KEY)
-
 app = Flask(__name__)
 CORS(app)
 
+_SUMMARIES_URL = (
+    "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/"
+)
 
-def _format_player(player):
+
+# ── helpers ─────────────────────────────────────────────────────────────────
+
+def _format_player(player: dict) -> dict:
     logoff = player.get("lastlogoff")
     return {
         "steamid": player.get("steamid"),
@@ -22,13 +31,44 @@ def _format_player(player):
         "profile_url": player.get("profileurl"),
         "state": player.get("personastate"),
         "country": player.get("loccountrycode"),
-        "last_logoff": str(datetime.datetime.fromtimestamp(logoff)) if logoff else None,
+        "last_logoff": (
+            str(datetime.datetime.fromtimestamp(logoff)) if logoff else None
+        ),
     }
+
+
+def _bulk_player_summaries(steam_ids: list[str]) -> list[dict]:
+    """
+    Fetch player summaries in batches of 100 (Steam API limit).
+    Time: O(ceil(N/100)) API calls — much better than O(N) one-by-one calls.
+    Space: O(N) for the returned list.
+    """
+    results: list[dict] = []
+    for i in range(0, len(steam_ids), 100):
+        chunk = steam_ids[i : i + 100]
+        resp = requests.get(
+            _SUMMARIES_URL,
+            params={"key": KEY, "steamids": ",".join(chunk)},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        players = resp.json().get("response", {}).get("players", [])
+        results.extend(players)
+    return results
+
+
+# ── routes ──────────────────────────────────────────────────────────────────
+
+@app.route("/api/config", methods=["GET"])
+def config():
+    """Return the default Steam ID loaded from .env so the frontend
+    can auto-load without any manual input."""
+    return jsonify({"steam_id": DEFAULT_STEAM_ID})
 
 
 @app.route("/api/user", methods=["GET"])
 def user_details():
-    steam_id = request.args.get("steam_id", "").strip()
+    steam_id = request.args.get("steam_id", DEFAULT_STEAM_ID).strip()
     if not steam_id:
         return jsonify({"error": "steam_id is required"}), 400
     try:
@@ -43,34 +83,42 @@ def user_details():
 
 @app.route("/api/friends", methods=["GET"])
 def friends_list():
-    steam_id = request.args.get("steam_id", "").strip()
+    steam_id = request.args.get("steam_id", DEFAULT_STEAM_ID).strip()
     if not steam_id:
         return jsonify({"error": "steam_id is required"}), 400
     try:
-        friends_raw = steam.users.get_user_friends_list(steam_id).get("friends", [])
-        friends = []
-        for f in friends_raw:
-            sid = f.get("steamid")
-            details = steam.users.get_user_details(sid).get("player", {})
-            friends.append(_format_player(details))
-        return jsonify(friends)
+        friends_raw = (
+            steam.users.get_user_friends_list(steam_id).get("friends", [])
+        )
+        if not friends_raw:
+            return jsonify([])
+        ids = [f["steamid"] for f in friends_raw if f.get("steamid")]
+        # Single batched call instead of one call per friend — O(1) vs O(N)
+        players = _bulk_player_summaries(ids)
+        return jsonify([_format_player(p) for p in players])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/recently-played", methods=["GET"])
 def recently_played():
-    steam_id = request.args.get("steam_id", "").strip()
+    steam_id = request.args.get("steam_id", DEFAULT_STEAM_ID).strip()
     if not steam_id:
         return jsonify({"error": "steam_id is required"}), 400
     try:
-        games = steam.users.get_user_recently_played_games(steam_id).get("games", [])
+        games = steam.users.get_user_recently_played_games(steam_id).get(
+            "games", []
+        )
         result = [
             {
                 "appid": g.get("appid"),
                 "name": g.get("name"),
-                "playtime_2weeks_hrs": round(g.get("playtime_2weeks", 0) / 60, 2),
-                "playtime_forever_hrs": round(g.get("playtime_forever", 0) / 60, 2),
+                "playtime_2weeks_hrs": round(
+                    g.get("playtime_2weeks", 0) / 60, 2
+                ),
+                "playtime_forever_hrs": round(
+                    g.get("playtime_forever", 0) / 60, 2
+                ),
                 "img_icon_url": g.get("img_icon_url"),
             }
             for g in games
@@ -82,18 +130,21 @@ def recently_played():
 
 @app.route("/api/owned-games", methods=["GET"])
 def owned_games():
-    steam_id = request.args.get("steam_id", "").strip()
+    steam_id = request.args.get("steam_id", DEFAULT_STEAM_ID).strip()
     if not steam_id:
         return jsonify({"error": "steam_id is required"}), 400
     try:
         data = steam.users.get_owned_games(steam_id)
         games = data.get("games", [])
+        # In-place sort: O(N log N) time, O(1) extra space
         games.sort(key=lambda x: x.get("playtime_forever", 0), reverse=True)
         result = [
             {
                 "appid": g.get("appid"),
                 "name": g.get("name"),
-                "playtime_forever_hrs": round(g.get("playtime_forever", 0) / 60, 2),
+                "playtime_forever_hrs": round(
+                    g.get("playtime_forever", 0) / 60, 2
+                ),
                 "img_icon_url": g.get("img_icon_url"),
             }
             for g in games
@@ -129,17 +180,21 @@ def game_details():
         data = res.get(str(appid), {}).get("data", {})
         if not data:
             return jsonify({"error": "Game not found"}), 404
-        return jsonify({
-            "appid": appid,
-            "name": data.get("name"),
-            "type": data.get("type"),
-            "developers": data.get("developers"),
-            "publishers": data.get("publishers"),
-            "description": data.get("short_description"),
-            "header_image": data.get("header_image"),
-            "website": data.get("website"),
-            "genres": [g.get("description") for g in data.get("genres", [])],
-        })
+        return jsonify(
+            {
+                "appid": appid,
+                "name": data.get("name"),
+                "type": data.get("type"),
+                "developers": data.get("developers"),
+                "publishers": data.get("publishers"),
+                "description": data.get("short_description"),
+                "header_image": data.get("header_image"),
+                "website": data.get("website"),
+                "genres": [
+                    g.get("description") for g in data.get("genres", [])
+                ],
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
