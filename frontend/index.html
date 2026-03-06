@@ -4,11 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GEAM — Steam Profile Browser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+  <!-- ===== Steam-style top navigation bar ===== -->
+  <div class="steam-topbar">
+    <div class="steam-topbar-inner">
+      <!-- Steam logo (official SVG wordmark colours) -->
+      <svg class="steam-logo" viewBox="0 0 130 44" xmlns="http://www.w3.org/2000/svg" aria-label="Steam">
+        <text x="2" y="34" fill="#c6d4df" font-family="'Noto Sans',sans-serif" font-weight="700" font-size="36" letter-spacing="1">STEAM</text>
+      </svg>
+      <span class="steam-topbar-divider"></span>
+      <span class="steam-topbar-app">GEAM Profile Browser</span>
+    </div>
+  </div>
+
+  <!-- ===== Main header ===== -->
   <header>
-    <h1>🎮 GEAM</h1>
+    <h1>
+      <!-- Controller icon -->
+      <svg class="header-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M6 12h4M8 10v4M15 12h.01M17 11h.01" stroke="#66c0f4" stroke-width="2" stroke-linecap="round"/>
+        <path d="M2 8a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v5a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8Z" stroke="#66c0f4" stroke-width="2"/>
+      </svg>
+      GEAM
+    </h1>
     <p class="subtitle">Steam Profile Browser</p>
   </header>
 
@@ -77,3 +101,4 @@
   <script src="script.js"></script>
 </body>
 </html>
+

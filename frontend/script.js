@@ -19,7 +19,7 @@ function clearError() {
 }
 
 function setLoading(containerId, msg = "Loading…") {
-  $(containerId).innerHTML = `<p class="loading">${msg}</p>`;
+  $(containerId).innerHTML = `<p class="loading"><span class="spinner"></span>${msg}</p>`;
 }
 
 function stateLabel(state) {
@@ -44,6 +44,20 @@ async function apiFetch(path) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
+}
+
+// ===== Auto-populate Steam ID from backend config =====
+async function loadConfig() {
+  try {
+    const cfg = await apiFetch("/config");
+    if (cfg.steam_id) {
+      $("steam-id-input").value = cfg.steam_id;
+      $("steam-id-input").placeholder = cfg.steam_id;
+    }
+  } catch (err) {
+    console.debug("Config load failed (non-critical):", err);
+    // Config endpoint is optional — silently ignore failures
+  }
 }
 
 // ===== Load profile =====
@@ -221,3 +235,7 @@ $("load-btn").addEventListener("click", loadProfile);
 $("steam-id-input").addEventListener("keydown", e => { if (e.key === "Enter") loadProfile(); });
 $("game-search-btn").addEventListener("click", searchGames);
 $("game-search-input").addEventListener("keydown", e => { if (e.key === "Enter") searchGames(); });
+
+// ===== Initialise =====
+loadConfig();
+

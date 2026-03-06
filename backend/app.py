@@ -1,13 +1,28 @@
 import os
 import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from steam_web_api import Steam
+from dotenv import load_dotenv
+
+# Load variables from backend/.env (or .env in the working directory)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 # ======= API KEYS =======
-# Set STEAM_API_KEY environment variable (or create a backend/.env file)
-KEY = os.getenv("STEAM_API_KEY", "C6915E5B9AA98A9B18AC84B20C7CE0ED")
+# Set STEAM_API_KEY and (optionally) STEAM_ID in backend/.env
+KEY = os.getenv("STEAM_API_KEY", "")
+if not KEY:
+    import warnings
+    warnings.warn(
+        "STEAM_API_KEY is not set. Copy backend/.env.example to backend/.env and add your key.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
 steam = Steam(KEY)
+
+# Maximum parallel workers for the friends detail fetch — tune via GEAM_FRIENDS_WORKERS env var.
+_FRIENDS_MAX_WORKERS = int(os.getenv("GEAM_FRIENDS_WORKERS", "20"))
 
 app = Flask(__name__)
 CORS(app)
@@ -24,6 +39,14 @@ def _format_player(player):
         "country": player.get("loccountrycode"),
         "last_logoff": str(datetime.datetime.fromtimestamp(logoff)) if logoff else None,
     }
+
+
+# ======= Config endpoint =======
+# Returns non-secret configuration that the frontend needs at startup.
+@app.route("/api/config", methods=["GET"])
+def get_config():
+    steam_id = os.getenv("STEAM_ID", "").strip()
+    return jsonify({"steam_id": steam_id if steam_id else None})
 
 
 @app.route("/api/user", methods=["GET"])
@@ -48,11 +71,22 @@ def friends_list():
         return jsonify({"error": "steam_id is required"}), 400
     try:
         friends_raw = steam.users.get_user_friends_list(steam_id).get("friends", [])
+        steam_ids = [f.get("steamid") for f in friends_raw if f.get("steamid")]
+
+        # Fetch all friend details in parallel — O(n) work, O(n/workers) wall-clock time.
+        def _fetch(sid):
+            return steam.users.get_user_details(sid).get("player", {})
+
         friends = []
-        for f in friends_raw:
-            sid = f.get("steamid")
-            details = steam.users.get_user_details(sid).get("player", {})
-            friends.append(_format_player(details))
+        with ThreadPoolExecutor(max_workers=min(_FRIENDS_MAX_WORKERS, len(steam_ids) or 1)) as pool:
+            futures = {pool.submit(_fetch, sid): sid for sid in steam_ids}
+            for future in as_completed(futures):
+                player = future.result()
+                if player:
+                    friends.append(_format_player(player))
+
+        # Sort alphabetically so the response is deterministic
+        friends.sort(key=lambda p: (p.get("name") or "").lower())
         return jsonify(friends)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
