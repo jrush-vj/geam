@@ -3,10 +3,18 @@ import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from steam_web_api import Steam
+from dotenv import load_dotenv
+
+# Load .env file (backend/.env)
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # ======= API KEYS =======
-# Set STEAM_API_KEY environment variable (or create a backend/.env file)
-KEY = os.getenv("STEAM_API_KEY", "C6915E5B9AA98A9B18AC84B20C7CE0ED")
+KEY = os.getenv("STEAM_API_KEY", "")
+DEFAULT_STEAM_ID = os.getenv("STEAM_ID", "")
+
+if not KEY:
+    raise RuntimeError("STEAM_API_KEY is not set. Copy backend/.env.example to backend/.env and fill in your key.")
+
 steam = Steam(KEY)
 
 app = Flask(__name__)
@@ -24,6 +32,12 @@ def _format_player(player):
         "country": player.get("loccountrycode"),
         "last_logoff": str(datetime.datetime.fromtimestamp(logoff)) if logoff else None,
     }
+
+
+@app.route("/api/config", methods=["GET"])
+def config():
+    """Return non-secret config values for the frontend (e.g. default steam_id)."""
+    return jsonify({"steam_id": DEFAULT_STEAM_ID})
 
 
 @app.route("/api/user", methods=["GET"])
@@ -51,8 +65,11 @@ def friends_list():
         friends = []
         for f in friends_raw:
             sid = f.get("steamid")
+            if not sid:
+                continue
             details = steam.users.get_user_details(sid).get("player", {})
-            friends.append(_format_player(details))
+            if details:
+                friends.append(_format_player(details))
         return jsonify(friends)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

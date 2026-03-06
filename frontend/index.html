@@ -4,74 +4,112 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GEAM — Steam Profile Browser</title>
+  <!-- Steam uses Motiva Sans; Inter is the closest free alternative -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>🎮 GEAM</h1>
-    <p class="subtitle">Steam Profile Browser</p>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="header-logo">
+        <!-- Steam-style controller icon -->
+        <svg class="steam-icon" viewBox="0 0 233 233" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path fill="#66c0f4" d="M116.5 0C52.2 0 0 52.2 0 116.5c0 54.4 37.3 100.3 87.9 113.2l31.5-77.5c-4.2-1.7-8-4.3-11-7.7-6.1-6.9-9.2-16-8.5-25.3 1.4-18.9 17.9-33.1 36.8-31.7 18.9 1.4 33.1 17.9 31.7 36.8-.7 9.3-5 17.7-11.8 23.6l-29.2 71.9c3.7.4 7.5.7 11.3.7 64.3 0 116.5-52.2 116.5-116.5S180.8 0 116.5 0zm-6.4 176.7-23.6 58.1C43.3 223.5 9 173.8 9 116.5 9 57.2 57.2 9 116.5 9c59.3 0 107.5 48.2 107.5 107.5 0 52.8-38.1 96.8-88.2 105.9l22.1-54.4c14.4-5.7 24.6-19.8 24.6-36.3 0-21.5-17.4-38.9-38.9-38.9s-38.9 17.4-38.9 38.9c0 15.2 8.7 28.4 21.4 34.9z"/>
+        </svg>
+        <span class="header-title">GEAM</span>
+      </div>
+      <p class="header-subtitle">Steam Profile Browser</p>
+    </div>
   </header>
 
-  <main>
+  <main class="app-main">
+
     <!-- Search bar -->
-    <section class="search-bar">
-      <input id="steam-id-input" type="text" placeholder="Enter Steam ID (e.g. 76561199168719281)" />
-      <button id="load-btn">Load Profile</button>
+    <section class="search-section">
+      <div class="search-row">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input id="steam-id-input" type="text" placeholder="Enter Steam ID (e.g. 76561199168719281)" autocomplete="off" />
+        <button id="load-btn"><i class="fa-solid fa-arrow-right-to-bracket"></i> Load Profile</button>
+      </div>
     </section>
 
     <!-- Error banner -->
-    <div id="error-banner" class="error-banner hidden"></div>
+    <div id="error-banner" class="error-banner hidden">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="error-text"></span>
+    </div>
 
     <!-- Profile card -->
     <section id="profile-section" class="hidden">
       <div class="profile-card">
-        <img id="profile-avatar" src="" alt="Avatar" />
+        <div class="profile-avatar-wrap">
+          <img id="profile-avatar" src="" alt="Avatar" />
+          <span id="profile-state" class="status-dot"></span>
+        </div>
         <div class="profile-info">
           <h2 id="profile-name"></h2>
-          <p id="profile-url"></p>
-          <p id="profile-country"></p>
-          <p id="profile-logoff"></p>
-          <span id="profile-state" class="status-badge"></span>
+          <a id="profile-url" href="#" target="_blank" rel="noopener noreferrer" class="profile-link">
+            <i class="fa-solid fa-up-right-from-square"></i> View on Steam
+          </a>
+          <p id="profile-country" class="profile-meta"></p>
+          <p id="profile-logoff" class="profile-meta"></p>
         </div>
       </div>
     </section>
 
     <!-- Tabs -->
     <section id="tabs-section" class="hidden">
-      <nav class="tabs">
-        <button class="tab-btn active" data-tab="friends">Friends</button>
-        <button class="tab-btn" data-tab="recently-played">Recently Played</button>
-        <button class="tab-btn" data-tab="owned-games">Owned Games</button>
-        <button class="tab-btn" data-tab="search">Search Games</button>
+      <nav class="tabs" role="tablist">
+        <button class="tab-btn active" data-tab="friends" role="tab" aria-selected="true">
+          <i class="fa-solid fa-users"></i> Friends
+        </button>
+        <button class="tab-btn" data-tab="recently-played" role="tab" aria-selected="false">
+          <i class="fa-solid fa-clock-rotate-left"></i> Recently Played
+        </button>
+        <button class="tab-btn" data-tab="owned-games" role="tab" aria-selected="false">
+          <i class="fa-solid fa-gamepad"></i> Owned Games
+        </button>
+        <button class="tab-btn" data-tab="search" role="tab" aria-selected="false">
+          <i class="fa-solid fa-magnifying-glass"></i> Search Games
+        </button>
       </nav>
 
       <!-- Friends tab -->
-      <div id="tab-friends" class="tab-content active">
+      <div id="tab-friends" class="tab-content active" role="tabpanel">
         <div id="friends-list" class="card-grid"></div>
       </div>
 
       <!-- Recently Played tab -->
-      <div id="tab-recently-played" class="tab-content">
+      <div id="tab-recently-played" class="tab-content" role="tabpanel">
         <div id="recently-played-list" class="card-grid"></div>
       </div>
 
       <!-- Owned Games tab -->
-      <div id="tab-owned-games" class="tab-content">
+      <div id="tab-owned-games" class="tab-content" role="tabpanel">
         <p id="owned-count" class="count-label"></p>
         <div id="owned-games-list" class="card-grid"></div>
       </div>
 
       <!-- Search tab -->
-      <div id="tab-search" class="tab-content">
-        <div class="search-bar">
-          <input id="game-search-input" type="text" placeholder="Search for a game…" />
-          <button id="game-search-btn">Search</button>
+      <div id="tab-search" class="tab-content" role="tabpanel">
+        <div class="search-row inner-search">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input id="game-search-input" type="text" placeholder="Search for a game…" autocomplete="off" />
+          <button id="game-search-btn"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
         </div>
         <div id="search-results" class="card-grid"></div>
         <!-- Game details panel -->
         <div id="game-details-panel" class="hidden game-details-panel"></div>
       </div>
     </section>
+
   </main>
 
   <script src="script.js"></script>
