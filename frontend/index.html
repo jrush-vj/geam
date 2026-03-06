@@ -7,72 +7,150 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>🎮 GEAM</h1>
-    <p class="subtitle">Steam Profile Browser</p>
-  </header>
+  <div class="app-window">
 
-  <main>
-    <!-- Search bar -->
-    <section class="search-bar">
-      <input id="steam-id-input" type="text" placeholder="Enter Steam ID (e.g. 76561199168719281)" />
-      <button id="load-btn">Load Profile</button>
-    </section>
+    <!-- ── Title / Nav Bar ──────────────────────────────────────── -->
+    <header class="title-bar">
+      <div class="title-bar-left">
+        <span class="steam-wordmark">GEAM</span>
+        <nav class="top-nav">
+          <button class="top-nav-btn active" data-tab="friends">COMMUNITY</button>
+          <button class="top-nav-btn" data-tab="recently-played">RECENT GAMES</button>
+          <button class="top-nav-btn" data-tab="owned-games">LIBRARY</button>
+          <button class="top-nav-btn" data-tab="search">STORE</button>
+        </nav>
+      </div>
+      <div class="title-bar-right">
+        <span id="header-username" class="header-username"></span>
+        <div class="window-controls">
+          <span class="wc-btn wc-min">─</span>
+          <span class="wc-btn wc-max">□</span>
+          <span class="wc-btn wc-close">✕</span>
+        </div>
+      </div>
+    </header>
 
-    <!-- Error banner -->
+    <!-- ── Sub-Bar (breadcrumb + search) ────────────────────────── -->
+    <div class="sub-bar">
+      <div class="sub-bar-inner">
+        <span class="sub-label">Steam Profile Viewer</span>
+        <div class="id-row">
+          <input id="steam-id-input" type="text" placeholder="Enter Steam ID…" class="id-input" />
+          <button id="load-btn" class="btn-primary">View Profile</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Error banner ─────────────────────────────────────────── -->
     <div id="error-banner" class="error-banner hidden"></div>
 
-    <!-- Profile card -->
-    <section id="profile-section" class="hidden">
-      <div class="profile-card">
-        <img id="profile-avatar" src="" alt="Avatar" />
-        <div class="profile-info">
-          <h2 id="profile-name"></h2>
-          <p id="profile-url"></p>
-          <p id="profile-country"></p>
-          <p id="profile-logoff"></p>
-          <span id="profile-state" class="status-badge"></span>
+    <!-- ── Loading spinner ──────────────────────────────────────── -->
+    <div id="global-spinner" class="spinner-overlay hidden">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- ── Main Layout ──────────────────────────────────────────── -->
+    <div id="main-layout" class="main-layout hidden">
+
+      <!-- Left Sidebar -->
+      <aside class="sidebar">
+        <div class="profile-card">
+          <div class="avatar-frame">
+            <img id="profile-avatar" src="" alt="Avatar" class="profile-avatar" />
+            <span id="avatar-state-ring" class="avatar-ring"></span>
+          </div>
+          <div class="profile-meta">
+            <p id="profile-name" class="profile-display-name"></p>
+            <span id="profile-state" class="status-badge"></span>
+            <p id="profile-country" class="profile-detail"></p>
+            <p id="profile-logoff" class="profile-detail muted"></p>
+            <a id="profile-url" href="#" target="_blank" class="profile-link">View on Steam ↗</a>
+          </div>
         </div>
-      </div>
-    </section>
 
-    <!-- Tabs -->
-    <section id="tabs-section" class="hidden">
-      <nav class="tabs">
-        <button class="tab-btn active" data-tab="friends">Friends</button>
-        <button class="tab-btn" data-tab="recently-played">Recently Played</button>
-        <button class="tab-btn" data-tab="owned-games">Owned Games</button>
-        <button class="tab-btn" data-tab="search">Search Games</button>
-      </nav>
+        <nav class="sidebar-nav">
+          <button class="snav-btn active" data-tab="friends">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm5 5H3a5 5 0 0 1 10 0z"/></svg>
+            Friends
+          </button>
+          <button class="snav-btn" data-tab="recently-played">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm4 3v5l4-2.5L7 5z"/></svg>
+            Recent Games
+          </button>
+          <button class="snav-btn" data-tab="owned-games">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1V3zm2 4h10v2H3V7zm2 4h6v2H5v-2z"/></svg>
+            Library
+          </button>
+          <button class="snav-btn" data-tab="search">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.415l-3.868-3.833zm-5.242 1.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+            Search Store
+          </button>
+        </nav>
+      </aside>
 
-      <!-- Friends tab -->
-      <div id="tab-friends" class="tab-content active">
-        <div id="friends-list" class="card-grid"></div>
-      </div>
+      <!-- Content Area -->
+      <main class="content-area">
 
-      <!-- Recently Played tab -->
-      <div id="tab-recently-played" class="tab-content">
-        <div id="recently-played-list" class="card-grid"></div>
-      </div>
-
-      <!-- Owned Games tab -->
-      <div id="tab-owned-games" class="tab-content">
-        <p id="owned-count" class="count-label"></p>
-        <div id="owned-games-list" class="card-grid"></div>
-      </div>
-
-      <!-- Search tab -->
-      <div id="tab-search" class="tab-content">
-        <div class="search-bar">
-          <input id="game-search-input" type="text" placeholder="Search for a game…" />
-          <button id="game-search-btn">Search</button>
+        <!-- Profile banner -->
+        <div class="profile-banner">
+          <div class="banner-inner">
+            <img id="banner-avatar" src="" alt="" class="banner-avatar" />
+            <div class="banner-info">
+              <h1 id="banner-name" class="banner-name"></h1>
+              <span id="banner-state" class="status-badge banner-badge"></span>
+            </div>
+          </div>
+          <div class="banner-tabs">
+            <button class="btab active" data-tab="friends">FRIENDS</button>
+            <button class="btab" data-tab="recently-played">RECENT GAMES</button>
+            <button class="btab" data-tab="owned-games">GAMES</button>
+            <button class="btab" data-tab="search">SEARCH</button>
+          </div>
         </div>
-        <div id="search-results" class="card-grid"></div>
-        <!-- Game details panel -->
-        <div id="game-details-panel" class="hidden game-details-panel"></div>
-      </div>
-    </section>
-  </main>
+
+        <!-- Tab: Friends -->
+        <div id="tab-friends" class="tab-pane active">
+          <div class="section-header">
+            <h2 class="section-title">Friends</h2>
+            <span id="friends-count" class="count-chip"></span>
+          </div>
+          <div id="friends-list" class="friends-grid"></div>
+        </div>
+
+        <!-- Tab: Recently Played -->
+        <div id="tab-recently-played" class="tab-pane hidden">
+          <div class="section-header">
+            <h2 class="section-title">Recently Played</h2>
+          </div>
+          <div id="recently-played-list" class="game-list"></div>
+        </div>
+
+        <!-- Tab: Owned Games -->
+        <div id="tab-owned-games" class="tab-pane hidden">
+          <div class="section-header">
+            <h2 class="section-title">Library</h2>
+            <span id="owned-count" class="count-chip"></span>
+          </div>
+          <input id="library-filter" type="text" placeholder="Filter games…" class="filter-input" />
+          <div id="owned-games-list" class="game-list"></div>
+        </div>
+
+        <!-- Tab: Search -->
+        <div id="tab-search" class="tab-pane hidden">
+          <div class="section-header">
+            <h2 class="section-title">Search Store</h2>
+          </div>
+          <div class="search-row">
+            <input id="game-search-input" type="text" placeholder="Search for a game…" class="id-input" />
+            <button id="game-search-btn" class="btn-primary">Search</button>
+          </div>
+          <div id="search-results" class="game-list"></div>
+          <div id="game-details-panel" class="game-details-panel hidden"></div>
+        </div>
+
+      </main>
+    </div><!-- /main-layout -->
+  </div><!-- /app-window -->
 
   <script src="script.js"></script>
 </body>

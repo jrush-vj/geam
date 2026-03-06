@@ -1,223 +1,310 @@
-// API base URL — override by setting window.GEAM_API_BASE before this script loads,
-// or update this default for your deployment environment.
-const API_BASE = (typeof window.GEAM_API_BASE !== "undefined" ? window.GEAM_API_BASE : "http://localhost:5000/api");
+/* ════════════════════════════════════════════════════════════════
+   GEAM — Steam profile browser
+   All Steam IDs come from .env via /api/config — no manual input
+   ════════════════════════════════════════════════════════════════ */
 
-// ===== State =====
+const API = "http://127.0.0.1:5000";
+
+// ── State ─────────────────────────────────────────────────────────
+const loaded = { friends: false, recent: false, library: false };
 let currentSteamId = "";
+let ownedGamesCache = [];   // kept for O(n) client-side filter
 
-// ===== Helpers =====
-function $(id) { return document.getElementById(id); }
+// ── DOM refs ──────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const steamInput    = $("steam-id-input");
+const loadBtn       = $("load-btn");
+const errorBanner   = $("error-banner");
+const spinner       = $("global-spinner");
+const mainLayout    = $("main-layout");
+const libraryFilter = $("library-filter");
 
-function showError(msg) {
-  const el = $("error-banner");
-  el.textContent = msg;
-  el.classList.remove("hidden");
-}
+// ── Startup ───────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    const cfg = await apiFetch("/api/config");
+    if (cfg.steam_id) {
+      currentSteamId = cfg.steam_id;
+      steamInput.value = cfg.steam_id;
+      await loadProfile(cfg.steam_id);
+    }
+  } catch {/* backend not running yet – let user enter manually */ }
 
-function clearError() {
-  $("error-banner").classList.add("hidden");
-}
+  loadBtn.addEventListener("click", async () => {
+    const id = steamInput.value.trim();
+    if (!id) return showError("Please enter a Steam ID.");
+    currentSteamId = id;
+    loaded.friends = loaded.recent = loaded.library = false;
+    ownedGamesCache = [];
+    await loadProfile(id);
+  });
 
-function setLoading(containerId, msg = "Loading…") {
-  $(containerId).innerHTML = `<p class="loading">${msg}</p>`;
-}
+  steamInput.addEventListener("keydown", e => e.key === "Enter" && loadBtn.click());
 
-function stateLabel(state) {
-  const map = { 0: "Offline", 1: "Online", 2: "Busy", 3: "Away", 4: "Snooze", 5: "Looking to trade", 6: "Looking to play" };
-  return map[state] ?? "Unknown";
-}
+  libraryFilter.addEventListener("input", () => {
+    const q = libraryFilter.value.toLowerCase();
+    renderGameList(
+      "owned-games-list",
+      ownedGamesCache.filter(g => g.name.toLowerCase().includes(q))
+    );
+  });
 
-function stateClass(state) {
-  if (state === 1) return "status-online";
-  if (state === 3 || state === 2) return "status-away";
-  return "status-offline";
-}
+  $("game-search-btn").addEventListener("click", runGameSearch);
+  $("game-search-input").addEventListener("keydown", e => e.key === "Enter" && runGameSearch());
 
-function gameIconUrl(appid, iconHash) {
-  if (!iconHash) return null;
-  return `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${iconHash}.jpg`;
-}
+  // Bind all three sets of tab buttons to the same handler
+  document.querySelectorAll(".top-nav-btn, .btab, .snav-btn").forEach(btn =>
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab))
+  );
+});
 
-// ===== API calls =====
+// ── API helper ────────────────────────────────────────────────────
 async function apiFetch(path) {
-  const res = await fetch(`${API_BASE}${path}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Request failed");
-  return data;
+  const r = await fetch(API + path);
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ error: r.statusText }));
+    throw new Error(err.error || r.statusText);
+  }
+  return r.json();
 }
 
-// ===== Load profile =====
-async function loadProfile() {
+// ── Error / Spinner ───────────────────────────────────────────────
+function showError(msg) {
+  errorBanner.textContent = msg;
+  errorBanner.classList.remove("hidden");
+}
+function clearError() { errorBanner.classList.add("hidden"); }
+function setLoading(on) { spinner.classList.toggle("hidden", !on); }
+
+// ── Tab switching ─────────────────────────────────────────────────
+function switchTab(tab) {
+  // Sync all button groups
+  document.querySelectorAll(".top-nav-btn, .btab, .snav-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+  // Show/hide panes
+  document.querySelectorAll(".tab-pane").forEach(p => {
+    p.classList.toggle("hidden", p.id !== `tab-${tab}`);
+    p.classList.toggle("active", p.id === `tab-${tab}`);
+  });
+  // Lazy-load data for the activated tab
+  if (currentSteamId) onTabActivate(tab);
+}
+
+async function onTabActivate(tab) {
+  if (tab === "friends"         && !loaded.friends) await loadFriends();
+  if (tab === "recently-played" && !loaded.recent)  await loadRecentlyPlayed();
+  if (tab === "owned-games"     && !loaded.library) await loadOwnedGames();
+}
+
+// ── Profile loader ────────────────────────────────────────────────
+async function loadProfile(steamId) {
   clearError();
-  const steamId = $("steam-id-input").value.trim();
-  if (!steamId) { showError("Please enter a Steam ID."); return; }
-  currentSteamId = steamId;
-
+  setLoading(true);
   try {
-    const user = await apiFetch(`/user?steam_id=${encodeURIComponent(steamId)}`);
-    renderProfile(user);
-    $("profile-section").classList.remove("hidden");
-    $("tabs-section").classList.remove("hidden");
-    // Load friends by default
-    loadFriends();
-  } catch (err) {
-    showError(`Failed to load profile: ${err.message}`);
-    $("profile-section").classList.add("hidden");
-    $("tabs-section").classList.add("hidden");
+    const p = await apiFetch(`/api/user?steam_id=${encodeURIComponent(steamId)}`);
+    renderProfile(p);
+    mainLayout.classList.remove("hidden");
+    // Auto-load the default (friends) tab on first load
+    loaded.friends = false;
+    await loadFriends();
+  } catch (e) {
+    showError("Could not load profile: " + e.message);
+  } finally {
+    setLoading(false);
   }
 }
 
-function renderProfile(user) {
-  $("profile-avatar").src = user.avatar || "";
-  $("profile-name").textContent = user.name || user.steamid;
-  $("profile-url").innerHTML = user.profile_url
-    ? `<a href="${user.profile_url}" target="_blank" rel="noopener">${user.profile_url}</a>`
-    : "";
-  $("profile-country").textContent = user.country ? `Country: ${user.country}` : "";
-  $("profile-logoff").textContent = user.last_logoff ? `Last seen: ${user.last_logoff}` : "";
-  const badge = $("profile-state");
-  badge.textContent = stateLabel(user.state);
-  badge.className = `status-badge ${stateClass(user.state)}`;
+function renderProfile(p) {
+  const stateLabel = personaStateLabel(p.state);
+  const stateClass = personaStateClass(p.state);
+
+  // Sidebar
+  $("profile-avatar").src = p.avatar;
+  $("profile-name").textContent = p.name;
+  $("profile-state").textContent = stateLabel;
+  $("profile-state").className = `status-badge ${stateClass}`;
+  $("avatar-state-ring").className = `avatar-ring ${stateClass.replace("status-", "")}`;
+  $("profile-country").textContent = p.country ? `🌍 ${p.country}` : "";
+  $("profile-logoff").textContent = p.last_logoff ? `Last seen: ${p.last_logoff}` : "";
+  $("profile-url").href = p.profile_url;
+
+  // Banner
+  $("banner-avatar").src = p.avatar;
+  $("banner-name").textContent = p.name;
+  $("banner-state").textContent = stateLabel;
+  $("banner-state").className = `status-badge banner-badge ${stateClass}`;
+
+  // Header username
+  $("header-username").textContent = p.name;
 }
 
-// ===== Friends =====
+// ── Friends ───────────────────────────────────────────────────────
 async function loadFriends() {
-  setLoading("friends-list");
+  setLoading(true);
+  clearError();
   try {
-    const friends = await apiFetch(`/friends?steam_id=${encodeURIComponent(currentSteamId)}`);
-    if (!friends.length) {
-      $("friends-list").innerHTML = "<p class='loading'>No friends found or profile is private.</p>";
-      return;
-    }
-    $("friends-list").innerHTML = friends.map(f => `
-      <div class="card">
-        <img src="${f.avatar || ''}" alt="${f.name}" />
-        <span class="card-name">${f.name || f.steamid}</span>
-        <span class="card-meta">${stateLabel(f.state)}</span>
-        ${f.country ? `<span class="card-meta">📍 ${f.country}</span>` : ""}
-        ${f.profile_url ? `<a href="${f.profile_url}" target="_blank" rel="noopener">View Profile</a>` : ""}
-      </div>
-    `).join("");
-  } catch (err) {
-    $("friends-list").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
-  }
-}
-
-// ===== Recently Played =====
-async function loadRecentlyPlayed() {
-  setLoading("recently-played-list");
-  try {
-    const games = await apiFetch(`/recently-played?steam_id=${encodeURIComponent(currentSteamId)}`);
-    if (!games.length) {
-      $("recently-played-list").innerHTML = "<p class='loading'>No recently played games.</p>";
-      return;
-    }
-    $("recently-played-list").innerHTML = games.map(g => {
-      const icon = gameIconUrl(g.appid, g.img_icon_url);
-      return `
-        <div class="card">
-          ${icon ? `<img src="${icon}" alt="${g.name}" />` : ""}
-          <span class="card-name">${g.name}</span>
-          <span class="card-meta">Last 2 weeks: ${g.playtime_2weeks_hrs} hrs</span>
-          <span class="card-meta">Total: ${g.playtime_forever_hrs} hrs</span>
-        </div>
-      `;
-    }).join("");
-  } catch (err) {
-    $("recently-played-list").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
-  }
-}
-
-// ===== Owned Games =====
-async function loadOwnedGames() {
-  setLoading("owned-games-list");
-  try {
-    const data = await apiFetch(`/owned-games?steam_id=${encodeURIComponent(currentSteamId)}`);
-    $("owned-count").textContent = `Total games: ${data.game_count}`;
-    if (!data.games.length) {
-      $("owned-games-list").innerHTML = "<p class='loading'>No games found or library is private.</p>";
-      return;
-    }
-    $("owned-games-list").innerHTML = data.games.map(g => {
-      const icon = gameIconUrl(g.appid, g.img_icon_url);
-      return `
-        <div class="card">
-          ${icon ? `<img src="${icon}" alt="${g.name}" />` : ""}
-          <span class="card-name">${g.name}</span>
-          <span class="card-meta">${g.playtime_forever_hrs} hrs played</span>
-        </div>
-      `;
-    }).join("");
-  } catch (err) {
-    $("owned-games-list").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
-  }
-}
-
-// ===== Game Search =====
-async function searchGames() {
-  const query = $("game-search-input").value.trim();
-  if (!query) return;
-  setLoading("search-results");
-  $("game-details-panel").classList.add("hidden");
-  try {
-    const results = await apiFetch(`/search-games?query=${encodeURIComponent(query)}`);
-    if (!results.length) {
-      $("search-results").innerHTML = "<p class='loading'>No games found.</p>";
-      return;
-    }
-    $("search-results").innerHTML = results.map(g => `
-      <div class="card">
-        <span class="card-name">${g.name}</span>
-        <span class="card-meta">AppID: ${g.appid}</span>
-        <button class="details-btn" data-appid="${g.appid}">View Details</button>
-      </div>
-    `).join("");
-    $("search-results").querySelectorAll(".details-btn").forEach(btn => {
-      btn.addEventListener("click", () => loadGameDetails(btn.dataset.appid));
+    const friends = await apiFetch(`/api/friends?steam_id=${encodeURIComponent(currentSteamId)}`);
+    loaded.friends = true;
+    $("friends-count").textContent = friends.length;
+    const ul = $("friends-list");
+    ul.innerHTML = "";
+    // Sort: online first, then alphabetically — O(N log N)
+    friends.sort((a, b) => {
+      if (b.state !== a.state) return b.state - a.state;
+      return (a.name || "").localeCompare(b.name || "");
     });
-  } catch (err) {
-    $("search-results").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
+    const frag = document.createDocumentFragment();
+    friends.forEach(f => {
+      const el = document.createElement("div");
+      el.className = "friend-row";
+      el.innerHTML = `
+        <img class="friend-avatar" src="${f.avatar}" alt="" loading="lazy" />
+        <div class="friend-info">
+          <div class="friend-name">${escHtml(f.name)}</div>
+          <div class="friend-status ${personaStateClass(f.state)}">${personaStateLabel(f.state)}</div>
+        </div>`;
+      frag.appendChild(el);
+    });
+    ul.appendChild(frag);
+  } catch (e) {
+    showError("Friends: " + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Recently Played ───────────────────────────────────────────────
+async function loadRecentlyPlayed() {
+  setLoading(true);
+  clearError();
+  try {
+    const games = await apiFetch(`/api/recently-played?steam_id=${encodeURIComponent(currentSteamId)}`);
+    loaded.recent = true;
+    renderGameList("recently-played-list", games, g => `${g.playtime_2weeks_hrs} hrs (2 wks)`);
+  } catch (e) {
+    showError("Recently played: " + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Owned Games ───────────────────────────────────────────────────
+async function loadOwnedGames() {
+  setLoading(true);
+  clearError();
+  try {
+    const data = await apiFetch(`/api/owned-games?steam_id=${encodeURIComponent(currentSteamId)}`);
+    loaded.library = true;
+    ownedGamesCache = data.games;
+    $("owned-count").textContent = data.game_count;
+    renderGameList("owned-games-list", ownedGamesCache, g => `${g.playtime_forever_hrs} hrs`);
+  } catch (e) {
+    showError("Library: " + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Game list renderer (shared) ───────────────────────────────────
+function renderGameList(containerId, games, playtimeFn = g => `${g.playtime_forever_hrs} hrs`) {
+  const container = $(containerId);
+  container.innerHTML = "";
+  if (!games.length) {
+    container.innerHTML = `<p style="color:var(--clr-muted);padding:12px">No games found.</p>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  games.forEach(g => {
+    const iconUrl = g.img_icon_url
+      ? `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`
+      : "https://store.steampowered.com/public/shared/images/header/globalheader_logo.png";
+    const row = document.createElement("div");
+    row.className = "game-row";
+    row.innerHTML = `
+      <img class="game-icon" src="${iconUrl}" alt="" loading="lazy" />
+      <span class="game-name">${escHtml(g.name)}</span>
+      <span class="game-playtime">${playtimeFn(g)}</span>`;
+    frag.appendChild(row);
+  });
+  container.appendChild(frag);
+}
+
+// ── Game Search ───────────────────────────────────────────────────
+async function runGameSearch() {
+  const q = $("game-search-input").value.trim();
+  if (!q) return;
+  clearError();
+  setLoading(true);
+  try {
+    const results = await apiFetch(`/api/search-games?query=${encodeURIComponent(q)}`);
+    const container = $("search-results");
+    container.innerHTML = "";
+    $("game-details-panel").classList.add("hidden");
+    if (!results.length) {
+      container.innerHTML = `<p style="color:var(--clr-muted)">No results found.</p>`;
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    results.forEach(g => {
+      const row = document.createElement("div");
+      row.className = "game-row";
+      row.innerHTML = `
+        <img class="game-icon" src="${g.tiny_image || ''}" alt="" loading="lazy" />
+        <span class="game-name">${escHtml(g.name)}</span>
+        <span class="game-playtime">App ${g.id}</span>`;
+      row.addEventListener("click", () => loadGameDetails(g.id));
+      frag.appendChild(row);
+    });
+    container.appendChild(frag);
+  } catch (e) {
+    showError("Search: " + e.message);
+  } finally {
+    setLoading(false);
   }
 }
 
 async function loadGameDetails(appid) {
-  const panel = $("game-details-panel");
-  panel.innerHTML = "<p class='loading'>Loading game details…</p>";
-  panel.classList.remove("hidden");
+  clearError();
+  setLoading(true);
   try {
-    const g = await apiFetch(`/game-details?appid=${encodeURIComponent(appid)}`);
+    const d = await apiFetch(`/api/game-details?appid=${appid}`);
+    const panel = $("game-details-panel");
+    panel.classList.remove("hidden");
+    const genres = (d.genres || []).map(g => `<span class="tag">${escHtml(g)}</span>`).join("");
+    const devs = (d.developers || []).join(", ");
+    const pubs = (d.publishers || []).join(", ");
     panel.innerHTML = `
-      ${g.header_image ? `<img src="${g.header_image}" alt="${g.name}" />` : ""}
-      <h3>${g.name}</h3>
-      ${g.description ? `<p>${g.description}</p>` : ""}
-      <p><strong>Developers:</strong> ${(g.developers || []).join(", ") || "N/A"}</p>
-      <p><strong>Publishers:</strong> ${(g.publishers || []).join(", ") || "N/A"}</p>
-      ${g.genres && g.genres.length ? `<p>${g.genres.map(genre => `<span class="tag">${genre}</span>`).join("")}</p>` : ""}
-      ${g.website ? `<p><a href="${g.website}" target="_blank" rel="noopener">${g.website}</a></p>` : ""}
-    `;
-  } catch (err) {
-    panel.innerHTML = `<p class="loading">Error: ${err.message}</p>`;
+      <h3>${escHtml(d.name)}</h3>
+      ${d.header_image ? `<img src="${d.header_image}" alt="${escHtml(d.name)}" />` : ""}
+      <p>${escHtml(d.description || "")}</p>
+      <p><strong style="color:var(--clr-text)">Developer:</strong> ${escHtml(devs)}</p>
+      <p><strong style="color:var(--clr-text)">Publisher:</strong> ${escHtml(pubs)}</p>
+      <div style="margin-top:8px">${genres}</div>
+      ${d.website ? `<p style="margin-top:10px"><a href="${d.website}" target="_blank">Official Website ↗</a></p>` : ""}`;
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    showError("Game details: " + e.message);
+  } finally {
+    setLoading(false);
   }
 }
 
-// ===== Tab switching =====
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-    btn.classList.add("active");
-    $(`tab-${btn.dataset.tab}`).classList.add("active");
+// ── Helpers ───────────────────────────────────────────────────────
+function personaStateLabel(state) {
+  return ["Offline","Online","Busy","Away","Snooze","Looking to trade","Looking to play"][state] ?? "Offline";
+}
 
-    // Lazy-load tab data
-    if (!currentSteamId) return;
-    if (btn.dataset.tab === "friends") loadFriends();
-    else if (btn.dataset.tab === "recently-played") loadRecentlyPlayed();
-    else if (btn.dataset.tab === "owned-games") loadOwnedGames();
-  });
-});
+function personaStateClass(state) {
+  if (state === 1) return "status-online";
+  if (state === 3 || state === 4) return "status-away";
+  if (state >= 5) return "status-ingame";
+  return "status-offline";
+}
 
-// ===== Event listeners =====
-$("load-btn").addEventListener("click", loadProfile);
-$("steam-id-input").addEventListener("keydown", e => { if (e.key === "Enter") loadProfile(); });
-$("game-search-btn").addEventListener("click", searchGames);
-$("game-search-input").addEventListener("keydown", e => { if (e.key === "Enter") searchGames(); });
+// XSS-safe text: O(n) one-pass via browser DOM
+const _esc = document.createElement("span");
+function escHtml(str) {
+  _esc.textContent = str ?? "";
+  return _esc.innerHTML;
+}
