@@ -65,6 +65,7 @@ body {
   color: var(--clr-text);
   text-transform: uppercase;
   background: linear-gradient(180deg, #c6d4df 40%, #66c0f4 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
