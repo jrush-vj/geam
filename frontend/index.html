@@ -3,76 +3,150 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GEAM — Steam Profile Browser</title>
+  <title>GEAM — Steam Client</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>🎮 GEAM</h1>
-    <p class="subtitle">Steam Profile Browser</p>
-  </header>
+  <div class="steam-app">
 
-  <main>
-    <!-- Search bar -->
-    <section class="search-bar">
-      <input id="steam-id-input" type="text" placeholder="Enter Steam ID (e.g. 76561199168719281)" />
-      <button id="load-btn">Load Profile</button>
-    </section>
+    <!-- ── Top header bar ────────────────────────────────── -->
+    <header class="steam-header">
+      <div class="steam-header-left">
+        <div class="steam-logo">
+          <svg class="steam-logo-icon" viewBox="0 0 233 233" xmlns="http://www.w3.org/2000/svg" aria-label="Steam logo" role="img">
+            <path d="M116.5 0C52.2 0 .6 51.5.6 115.9c0 55.3 38.7 101.5 90.7 113.1l15.9-39.2a44.5 44.5 0 01-7.3-4.2c-8.4-6.3-13.3-16.4-12.9-26.9.4-10.2 5.5-19.6 13.9-25.7a40 40 0 0116.3-6.3c5.8-.6 11.7.2 17.1 2.5 1.8.8 3.6 1.7 5.2 2.8l28.9-41.4c-7.3-7.5-11.5-17.5-11.5-28.2 0-22.2 18-40.2 40.2-40.2s40.2 18 40.2 40.2-18 40.2-40.2 40.2c-1.7 0-3.4-.1-5-.3L153 129.6c.9 4.2 1 8.6.2 12.9-1.5 7.9-6 14.9-12.6 19.5-6.5 4.6-14.5 6.4-22.4 5a39.5 39.5 0 01-16.2-8.6l-16.4 40.4c4.6 1.1 9.3 1.7 14.2 1.7h.5C164.5 200.2 216.2 148.3 216.2 84c0-64.4-51.5-115.9-115.9-115.9L116.5 0z"/>
+          </svg>
+          <span>STEAM</span>
+        </div>
+        <nav class="steam-menu-bar">
+          <span class="menu-item">Steam</span>
+          <span class="menu-item">View</span>
+          <span class="menu-item">Friends</span>
+          <span class="menu-item">Games</span>
+          <span class="menu-item">Help</span>
+        </nav>
+      </div>
+      <div id="header-user" class="header-user hidden">
+        <img id="header-avatar" src="" alt="" class="header-avatar" />
+        <span id="header-username" class="header-username"></span>
+        <span id="header-status-dot" class="dot offline"></span>
+      </div>
+    </header>
 
-    <!-- Error banner -->
+    <!-- ── Error banner ──────────────────────────────────── -->
     <div id="error-banner" class="error-banner hidden"></div>
 
-    <!-- Profile card -->
-    <section id="profile-section" class="hidden">
-      <div class="profile-card">
-        <img id="profile-avatar" src="" alt="Avatar" />
-        <div class="profile-info">
-          <h2 id="profile-name"></h2>
-          <p id="profile-url"></p>
-          <p id="profile-country"></p>
-          <p id="profile-logoff"></p>
-          <span id="profile-state" class="status-badge"></span>
+    <!-- ── Loading overlay ───────────────────────────────── -->
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Connecting to Steam…</p>
+    </div>
+
+    <!-- ── Body: sidebar + main ──────────────────────────── -->
+    <div class="steam-body">
+
+      <!-- Left sidebar -->
+      <aside class="steam-sidebar">
+
+        <!-- User mini card -->
+        <div id="sidebar-profile" class="sidebar-profile hidden">
+          <div class="sidebar-avatar-wrap">
+            <img id="sidebar-avatar" src="" alt="Avatar" class="sidebar-avatar" />
+            <span id="sidebar-status-dot" class="dot offline"></span>
+          </div>
+          <div class="sidebar-user-text">
+            <div id="sidebar-username" class="sidebar-username">—</div>
+            <div id="sidebar-status-text" class="sidebar-status-text">Offline</div>
+          </div>
         </div>
-      </div>
-    </section>
 
-    <!-- Tabs -->
-    <section id="tabs-section" class="hidden">
-      <nav class="tabs">
-        <button class="tab-btn active" data-tab="friends">Friends</button>
-        <button class="tab-btn" data-tab="recently-played">Recently Played</button>
-        <button class="tab-btn" data-tab="owned-games">Owned Games</button>
-        <button class="tab-btn" data-tab="search">Search Games</button>
-      </nav>
+        <!-- Navigation -->
+        <nav id="sidebar-nav" class="sidebar-nav hidden">
+          <a class="nav-item active" data-section="library">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="16" height="11" rx="1"/><path d="M2 17h16"/></svg>
+            Library
+            <span id="nav-game-count" class="nav-badge hidden"></span>
+          </a>
+          <a class="nav-item" data-section="recently-played">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2" stroke-linecap="round"/></svg>
+            Recent
+          </a>
+          <a class="nav-item" data-section="friends">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3"/><path d="M2 17c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="15" cy="6" r="2.5"/><path d="M17.5 17c0-2.5-1.8-4.5-4.5-5"/></svg>
+            Friends
+            <span id="nav-friends-count" class="nav-badge hidden"></span>
+          </a>
+          <a class="nav-item" data-section="search">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="5.5"/><path d="M13 13l4 4" stroke-linecap="round"/></svg>
+            Find Games
+          </a>
+        </nav>
 
-      <!-- Friends tab -->
-      <div id="tab-friends" class="tab-content active">
-        <div id="friends-list" class="card-grid"></div>
-      </div>
-
-      <!-- Recently Played tab -->
-      <div id="tab-recently-played" class="tab-content">
-        <div id="recently-played-list" class="card-grid"></div>
-      </div>
-
-      <!-- Owned Games tab -->
-      <div id="tab-owned-games" class="tab-content">
-        <p id="owned-count" class="count-label"></p>
-        <div id="owned-games-list" class="card-grid"></div>
-      </div>
-
-      <!-- Search tab -->
-      <div id="tab-search" class="tab-content">
-        <div class="search-bar">
-          <input id="game-search-input" type="text" placeholder="Search for a game…" />
-          <button id="game-search-btn">Search</button>
+        <!-- Compact friends in sidebar -->
+        <div id="sidebar-friends-section" class="sidebar-friends-section hidden">
+          <div class="sidebar-section-label">FRIENDS</div>
+          <div id="sidebar-friends-list" class="sidebar-friends-list"></div>
         </div>
-        <div id="search-results" class="card-grid"></div>
-        <!-- Game details panel -->
-        <div id="game-details-panel" class="hidden game-details-panel"></div>
-      </div>
-    </section>
-  </main>
+
+      </aside>
+
+      <!-- Main content -->
+      <main class="steam-content">
+
+        <!-- Profile header strip -->
+        <div id="profile-header" class="profile-header hidden">
+          <img id="profile-avatar-full" src="" alt="Avatar" class="profile-avatar-full" />
+          <div class="profile-header-info">
+            <h2 id="profile-display-name" class="profile-display-name"></h2>
+            <span id="profile-status-badge" class="profile-status-badge"></span>
+            <div id="profile-country" class="profile-meta"></div>
+            <div id="profile-logoff" class="profile-meta"></div>
+            <a id="profile-url-link" href="#" target="_blank" rel="noopener" class="profile-url-link"></a>
+          </div>
+        </div>
+
+        <!-- ── Library ──────────────────────────────────── -->
+        <section id="section-library" class="content-section hidden">
+          <div class="section-header">
+            <span class="section-title">GAMES</span>
+            <span id="game-count-label" class="section-meta"></span>
+          </div>
+          <div id="owned-games-grid" class="games-grid"></div>
+        </section>
+
+        <!-- ── Recently Played ─────────────────────────── -->
+        <section id="section-recently-played" class="content-section hidden">
+          <div class="section-header">
+            <span class="section-title">RECENTLY PLAYED</span>
+            <span class="section-meta">Last 2 weeks</span>
+          </div>
+          <div id="recently-played-list" class="recently-played-list"></div>
+        </section>
+
+        <!-- ── Friends ─────────────────────────────────── -->
+        <section id="section-friends" class="content-section hidden">
+          <div class="section-header">
+            <span class="section-title">FRIENDS</span>
+          </div>
+          <div id="friends-main-list" class="friends-main-list"></div>
+        </section>
+
+        <!-- ── Find Games ──────────────────────────────── -->
+        <section id="section-search" class="content-section hidden">
+          <div class="section-header">
+            <span class="section-title">FIND GAMES</span>
+          </div>
+          <div class="search-row">
+            <input id="game-search-input" class="steam-input" type="text" placeholder="Search games on Steam…" />
+            <button id="game-search-btn" class="btn-green">Search</button>
+          </div>
+          <div id="search-results" class="games-grid"></div>
+          <div id="game-details-panel" class="game-details-panel hidden"></div>
+        </section>
+
+      </main>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

@@ -1,9 +1,10 @@
-// API base URL — override by setting window.GEAM_API_BASE before this script loads,
-// or update this default for your deployment environment.
+// API base URL — override by setting window.GEAM_API_BASE before this script loads.
 const API_BASE = (typeof window.GEAM_API_BASE !== "undefined" ? window.GEAM_API_BASE : "http://localhost:5000/api");
 
 // ===== State =====
 let currentSteamId = "";
+let cachedFriends = [];
+let libraryLoaded = false;
 
 // ===== Helpers =====
 function $(id) { return document.getElementById(id); }
@@ -14,13 +15,9 @@ function showError(msg) {
   el.classList.remove("hidden");
 }
 
-function clearError() {
-  $("error-banner").classList.add("hidden");
-}
+function clearError() { $("error-banner").classList.add("hidden"); }
 
-function setLoading(containerId, msg = "Loading…") {
-  $(containerId).innerHTML = `<p class="loading">${msg}</p>`;
-}
+function showLoading(show) { $("loading-overlay").classList.toggle("hidden", !show); }
 
 function stateLabel(state) {
   const map = { 0: "Offline", 1: "Online", 2: "Busy", 3: "Away", 4: "Snooze", 5: "Looking to trade", 6: "Looking to play" };
@@ -28,17 +25,17 @@ function stateLabel(state) {
 }
 
 function stateClass(state) {
-  if (state === 1) return "status-online";
-  if (state === 3 || state === 2) return "status-away";
-  return "status-offline";
+  if (state === 1) return "online";
+  if (state === 2 || state === 3 || state === 4) return "away";
+  return "offline";
 }
 
-function gameIconUrl(appid, iconHash) {
-  if (!iconHash) return null;
-  return `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${iconHash}.jpg`;
+// Use Steam's CDN header images (460×215) for a library-accurate look
+function gameHeaderUrl(appid) {
+  return `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`;
 }
 
-// ===== API calls =====
+// ===== API =====
 async function apiFetch(path) {
   const res = await fetch(`${API_BASE}${path}`);
   const data = await res.json();
@@ -46,110 +43,203 @@ async function apiFetch(path) {
   return data;
 }
 
-// ===== Load profile =====
-async function loadProfile() {
+// ===== Initialisation — auto-load Steam ID from .env via backend =====
+async function init() {
+  showLoading(true);
   clearError();
-  const steamId = $("steam-id-input").value.trim();
-  if (!steamId) { showError("Please enter a Steam ID."); return; }
-  currentSteamId = steamId;
-
   try {
-    const user = await apiFetch(`/user?steam_id=${encodeURIComponent(steamId)}`);
-    renderProfile(user);
-    $("profile-section").classList.remove("hidden");
-    $("tabs-section").classList.remove("hidden");
-    // Load friends by default
+    const config = await apiFetch("/config");
+    if (!config.steam_id) {
+      showLoading(false);
+      showError("STEAM_ID is not configured. Please set STEAM_ID in the backend .env file.");
+      return;
+    }
+    currentSteamId = config.steam_id;
+    await loadProfile();
+    // Start loading friends and library in parallel
     loadFriends();
+    loadOwnedGames();
+    showSection("library");
   } catch (err) {
+    showLoading(false);
+    showError(`Initialisation failed: ${err.message}`);
+  }
+}
+
+// ===== Profile =====
+async function loadProfile() {
+  try {
+    const user = await apiFetch(`/user?steam_id=${encodeURIComponent(currentSteamId)}`);
+    renderProfile(user);
+    showLoading(false);
+  } catch (err) {
+    showLoading(false);
     showError(`Failed to load profile: ${err.message}`);
-    $("profile-section").classList.add("hidden");
-    $("tabs-section").classList.add("hidden");
+    throw err;
   }
 }
 
 function renderProfile(user) {
-  $("profile-avatar").src = user.avatar || "";
-  $("profile-name").textContent = user.name || user.steamid;
-  $("profile-url").innerHTML = user.profile_url
-    ? `<a href="${user.profile_url}" target="_blank" rel="noopener">${user.profile_url}</a>`
-    : "";
-  $("profile-country").textContent = user.country ? `Country: ${user.country}` : "";
-  $("profile-logoff").textContent = user.last_logoff ? `Last seen: ${user.last_logoff}` : "";
-  const badge = $("profile-state");
-  badge.textContent = stateLabel(user.state);
-  badge.className = `status-badge ${stateClass(user.state)}`;
+  const cls   = stateClass(user.state);
+  const label = stateLabel(user.state);
+
+  // Header bar user info
+  $("header-avatar").src = user.avatar || "";
+  $("header-username").textContent = user.name || user.steamid;
+  $("header-status-dot").className = `dot ${cls}`;
+  $("header-user").classList.remove("hidden");
+
+  // Sidebar mini card
+  $("sidebar-avatar").src = user.avatar || "";
+  $("sidebar-username").textContent = user.name || user.steamid;
+  $("sidebar-status-dot").className = `dot ${cls}`;
+  $("sidebar-status-text").textContent = label;
+  $("sidebar-profile").classList.remove("hidden");
+  $("sidebar-nav").classList.remove("hidden");
+  $("sidebar-friends-section").classList.remove("hidden");
+
+  // Profile header strip
+  $("profile-avatar-full").src = user.avatar || "";
+  $("profile-display-name").textContent = user.name || user.steamid;
+  const badge = $("profile-status-badge");
+  badge.textContent = label;
+  badge.className = `profile-status-badge ${cls}`;
+  $("profile-country").textContent = user.country ? `📍 ${user.country}` : "";
+  $("profile-logoff").textContent = user.last_logoff ? `Last online: ${user.last_logoff}` : "";
+  const link = $("profile-url-link");
+  if (user.profile_url) { link.href = user.profile_url; link.textContent = user.profile_url; }
+  $("profile-header").classList.remove("hidden");
+}
+
+// ===== Section switching =====
+function showSection(id) {
+  document.querySelectorAll(".content-section").forEach(s => s.classList.add("hidden"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  const sec = $(`section-${id}`);
+  if (sec) sec.classList.remove("hidden");
+  const nav = document.querySelector(`.nav-item[data-section="${id}"]`);
+  if (nav) nav.classList.add("active");
 }
 
 // ===== Friends =====
 async function loadFriends() {
-  setLoading("friends-list");
+  $("sidebar-friends-list").innerHTML = `<p class="msg" style="padding:8px 12px">Loading…</p>`;
   try {
-    const friends = await apiFetch(`/friends?steam_id=${encodeURIComponent(currentSteamId)}`);
-    if (!friends.length) {
-      $("friends-list").innerHTML = "<p class='loading'>No friends found or profile is private.</p>";
-      return;
+    cachedFriends = await apiFetch(`/friends?steam_id=${encodeURIComponent(currentSteamId)}`);
+
+    // Online badge on nav item
+    const onlineCount = cachedFriends.filter(f => f.state > 0).length;
+    const countBadge = $("nav-friends-count");
+    if (cachedFriends.length) {
+      countBadge.textContent = onlineCount > 0 ? `${onlineCount} online` : cachedFriends.length;
+      countBadge.classList.remove("hidden");
     }
-    $("friends-list").innerHTML = friends.map(f => `
-      <div class="card">
-        <img src="${f.avatar || ''}" alt="${f.name}" />
-        <span class="card-name">${f.name || f.steamid}</span>
-        <span class="card-meta">${stateLabel(f.state)}</span>
-        ${f.country ? `<span class="card-meta">📍 ${f.country}</span>` : ""}
-        ${f.profile_url ? `<a href="${f.profile_url}" target="_blank" rel="noopener">View Profile</a>` : ""}
-      </div>
-    `).join("");
+
+    renderSidebarFriends(cachedFriends);
+
+    // Re-render full friends view if it's visible
+    if (!$("section-friends").classList.contains("hidden")) {
+      renderFriendsSection(cachedFriends);
+    }
   } catch (err) {
-    $("friends-list").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
+    console.error("Friends load error:", err);
+    $("sidebar-friends-list").innerHTML = `<p class="msg msg-error" style="padding:8px 12px">Error loading friends</p>`;
+  }
+}
+
+function friendsSorted(friends) {
+  // Online/Away first, then alphabetical within each group
+  return [...friends].sort((a, b) => {
+    const ao = a.state > 0 ? 1 : 0, bo = b.state > 0 ? 1 : 0;
+    if (ao !== bo) return bo - ao;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+}
+
+function renderSidebarFriends(friends) {
+  $("sidebar-friends-list").innerHTML = friendsSorted(friends).map(f => {
+    const cls = stateClass(f.state);
+    return `
+      <div class="sidebar-friend-item">
+        <div class="sidebar-friend-avatar-wrap">
+          <img src="${f.avatar || ""}" alt="" class="sidebar-friend-avatar" />
+          <span class="dot ${cls}"></span>
+        </div>
+        <div>
+          <div class="sidebar-friend-name">${f.name || f.steamid}</div>
+          <div class="sidebar-friend-status">${stateLabel(f.state)}</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function renderFriendsSection(friends) {
+  $("friends-main-list").innerHTML = friends.length
+    ? friendsSorted(friends).map(f => {
+        const cls = stateClass(f.state);
+        return `
+          <div class="friend-row">
+            <div class="friend-avatar-wrap">
+              <img src="${f.avatar || ""}" alt="" class="friend-avatar" />
+              <span class="dot ${cls}"></span>
+            </div>
+            <div class="friend-info">
+              <div class="friend-name">${f.name || f.steamid}</div>
+              <div class="friend-status ${cls}">${stateLabel(f.state)}</div>
+              ${f.country ? `<div class="friend-country">📍 ${f.country}</div>` : ""}
+            </div>
+            ${f.profile_url ? `<a href="${f.profile_url}" target="_blank" rel="noopener" class="friend-profile-link">View Profile</a>` : ""}
+          </div>`;
+      }).join("")
+    : `<p class="msg">No friends found or profile is private.</p>`;
+}
+
+// ===== Owned Games =====
+async function loadOwnedGames() {
+  $("owned-games-grid").innerHTML = `<p class="msg">Loading library…</p>`;
+  try {
+    const data = await apiFetch(`/owned-games?steam_id=${encodeURIComponent(currentSteamId)}`);
+    $("game-count-label").textContent = `${data.game_count} games`;
+    const countBadge = $("nav-game-count");
+    countBadge.textContent = data.game_count;
+    countBadge.classList.remove("hidden");
+    libraryLoaded = true;
+
+    $("owned-games-grid").innerHTML = data.games.length
+      ? data.games.map(g => `
+          <div class="game-card">
+            <img src="${gameHeaderUrl(g.appid)}" alt="${g.name}" class="game-card-img"
+                 onerror="this.style.opacity='0.3'" />
+            <div class="game-card-body">
+              <div class="game-card-name">${g.name}</div>
+              <div class="game-card-meta">${g.playtime_forever_hrs} hrs on record</div>
+            </div>
+          </div>`).join("")
+      : `<p class="msg">No games found or library is private.</p>`;
+  } catch (err) {
+    $("owned-games-grid").innerHTML = `<p class="msg msg-error">Error: ${err.message}</p>`;
   }
 }
 
 // ===== Recently Played =====
 async function loadRecentlyPlayed() {
-  setLoading("recently-played-list");
+  $("recently-played-list").innerHTML = `<p class="msg">Loading…</p>`;
   try {
     const games = await apiFetch(`/recently-played?steam_id=${encodeURIComponent(currentSteamId)}`);
-    if (!games.length) {
-      $("recently-played-list").innerHTML = "<p class='loading'>No recently played games.</p>";
-      return;
-    }
-    $("recently-played-list").innerHTML = games.map(g => {
-      const icon = gameIconUrl(g.appid, g.img_icon_url);
-      return `
-        <div class="card">
-          ${icon ? `<img src="${icon}" alt="${g.name}" />` : ""}
-          <span class="card-name">${g.name}</span>
-          <span class="card-meta">Last 2 weeks: ${g.playtime_2weeks_hrs} hrs</span>
-          <span class="card-meta">Total: ${g.playtime_forever_hrs} hrs</span>
-        </div>
-      `;
-    }).join("");
+    $("recently-played-list").innerHTML = games.length
+      ? games.map(g => `
+          <div class="recent-row">
+            <img src="${gameHeaderUrl(g.appid)}" alt="${g.name}" class="recent-img"
+                 onerror="this.style.display='none'" />
+            <div class="recent-info">
+              <div class="recent-name">${g.name}</div>
+              <div class="recent-playtime">${g.playtime_2weeks_hrs} hrs past 2 weeks</div>
+              <div class="recent-playtime">${g.playtime_forever_hrs} hrs on record</div>
+            </div>
+          </div>`).join("")
+      : `<p class="msg">No recently played games.</p>`;
   } catch (err) {
-    $("recently-played-list").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
-  }
-}
-
-// ===== Owned Games =====
-async function loadOwnedGames() {
-  setLoading("owned-games-list");
-  try {
-    const data = await apiFetch(`/owned-games?steam_id=${encodeURIComponent(currentSteamId)}`);
-    $("owned-count").textContent = `Total games: ${data.game_count}`;
-    if (!data.games.length) {
-      $("owned-games-list").innerHTML = "<p class='loading'>No games found or library is private.</p>";
-      return;
-    }
-    $("owned-games-list").innerHTML = data.games.map(g => {
-      const icon = gameIconUrl(g.appid, g.img_icon_url);
-      return `
-        <div class="card">
-          ${icon ? `<img src="${icon}" alt="${g.name}" />` : ""}
-          <span class="card-name">${g.name}</span>
-          <span class="card-meta">${g.playtime_forever_hrs} hrs played</span>
-        </div>
-      `;
-    }).join("");
-  } catch (err) {
-    $("owned-games-list").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
+    $("recently-played-list").innerHTML = `<p class="msg msg-error">Error: ${err.message}</p>`;
   }
 }
 
@@ -157,67 +247,66 @@ async function loadOwnedGames() {
 async function searchGames() {
   const query = $("game-search-input").value.trim();
   if (!query) return;
-  setLoading("search-results");
+  $("search-results").innerHTML = `<p class="msg">Searching…</p>`;
   $("game-details-panel").classList.add("hidden");
   try {
     const results = await apiFetch(`/search-games?query=${encodeURIComponent(query)}`);
-    if (!results.length) {
-      $("search-results").innerHTML = "<p class='loading'>No games found.</p>";
-      return;
-    }
-    $("search-results").innerHTML = results.map(g => `
-      <div class="card">
-        <span class="card-name">${g.name}</span>
-        <span class="card-meta">AppID: ${g.appid}</span>
-        <button class="details-btn" data-appid="${g.appid}">View Details</button>
-      </div>
-    `).join("");
+    $("search-results").innerHTML = results.length
+      ? results.map(g => `
+          <div class="game-card">
+            <img src="${gameHeaderUrl(g.appid)}" alt="${g.name}" class="game-card-img"
+                 onerror="this.style.display='none'" />
+            <div class="game-card-body">
+              <div class="game-card-name">${g.name}</div>
+              <div class="search-card-appid">AppID: ${g.appid}</div>
+              <button class="details-btn" data-appid="${g.appid}">View Details</button>
+            </div>
+          </div>`).join("")
+      : `<p class="msg">No games found.</p>`;
+
     $("search-results").querySelectorAll(".details-btn").forEach(btn => {
       btn.addEventListener("click", () => loadGameDetails(btn.dataset.appid));
     });
   } catch (err) {
-    $("search-results").innerHTML = `<p class="loading">Error: ${err.message}</p>`;
+    $("search-results").innerHTML = `<p class="msg msg-error">Error: ${err.message}</p>`;
   }
 }
 
 async function loadGameDetails(appid) {
   const panel = $("game-details-panel");
-  panel.innerHTML = "<p class='loading'>Loading game details…</p>";
+  panel.innerHTML = `<div class="gd-body"><p class="msg">Loading details…</p></div>`;
   panel.classList.remove("hidden");
   try {
     const g = await apiFetch(`/game-details?appid=${encodeURIComponent(appid)}`);
     panel.innerHTML = `
-      ${g.header_image ? `<img src="${g.header_image}" alt="${g.name}" />` : ""}
-      <h3>${g.name}</h3>
-      ${g.description ? `<p>${g.description}</p>` : ""}
-      <p><strong>Developers:</strong> ${(g.developers || []).join(", ") || "N/A"}</p>
-      <p><strong>Publishers:</strong> ${(g.publishers || []).join(", ") || "N/A"}</p>
-      ${g.genres && g.genres.length ? `<p>${g.genres.map(genre => `<span class="tag">${genre}</span>`).join("")}</p>` : ""}
-      ${g.website ? `<p><a href="${g.website}" target="_blank" rel="noopener">${g.website}</a></p>` : ""}
-    `;
+      ${g.header_image ? `<img src="${g.header_image}" alt="${g.name}" class="gd-header-img" />` : ""}
+      <div class="gd-body">
+        <h3 class="gd-title">${g.name}</h3>
+        ${g.description ? `<p class="gd-desc">${g.description}</p>` : ""}
+        <p class="gd-meta"><strong>Developers:</strong> ${(g.developers || []).join(", ") || "N/A"}</p>
+        <p class="gd-meta"><strong>Publishers:</strong> ${(g.publishers || []).join(", ") || "N/A"}</p>
+        ${g.genres && g.genres.length ? `<div style="margin-top:6px">${g.genres.map(gn => `<span class="genre-tag">${gn}</span>`).join("")}</div>` : ""}
+        ${g.website ? `<p style="margin-top:8px"><a href="${g.website}" target="_blank" rel="noopener" class="gd-link">${g.website}</a></p>` : ""}
+      </div>`;
   } catch (err) {
-    panel.innerHTML = `<p class="loading">Error: ${err.message}</p>`;
+    panel.innerHTML = `<div class="gd-body"><p class="msg msg-error">Error: ${err.message}</p></div>`;
   }
 }
 
-// ===== Tab switching =====
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-    btn.classList.add("active");
-    $(`tab-${btn.dataset.tab}`).classList.add("active");
-
-    // Lazy-load tab data
+// ===== Nav event listeners =====
+document.querySelectorAll(".nav-item").forEach(item => {
+  item.addEventListener("click", () => {
     if (!currentSteamId) return;
-    if (btn.dataset.tab === "friends") loadFriends();
-    else if (btn.dataset.tab === "recently-played") loadRecentlyPlayed();
-    else if (btn.dataset.tab === "owned-games") loadOwnedGames();
+    const section = item.dataset.section;
+    showSection(section);
+    if (section === "recently-played") loadRecentlyPlayed();
+    else if (section === "friends")    renderFriendsSection(cachedFriends);
+    else if (section === "library" && !libraryLoaded) loadOwnedGames();
   });
 });
 
-// ===== Event listeners =====
-$("load-btn").addEventListener("click", loadProfile);
-$("steam-id-input").addEventListener("keydown", e => { if (e.key === "Enter") loadProfile(); });
 $("game-search-btn").addEventListener("click", searchGames);
 $("game-search-input").addEventListener("keydown", e => { if (e.key === "Enter") searchGames(); });
+
+// ===== Boot =====
+document.addEventListener("DOMContentLoaded", init);

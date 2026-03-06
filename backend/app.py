@@ -4,9 +4,14 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from steam_web_api import Steam
 
-# ======= API KEYS =======
-# Set STEAM_API_KEY environment variable (or create a backend/.env file)
-KEY = os.getenv("STEAM_API_KEY", "C6915E5B9AA98A9B18AC84B20C7CE0ED")
+# ======= CONFIG FROM ENV =======
+KEY = os.getenv("STEAM_API_KEY", "")
+STEAM_ID = os.getenv("STEAM_ID", "")
+
+if not KEY:
+    import sys
+    print("ERROR: STEAM_API_KEY is not set. Please add it to backend/.env", file=sys.stderr)
+
 steam = Steam(KEY)
 
 app = Flask(__name__)
@@ -24,6 +29,12 @@ def _format_player(player):
         "country": player.get("loccountrycode"),
         "last_logoff": str(datetime.datetime.fromtimestamp(logoff)) if logoff else None,
     }
+
+
+@app.route("/api/config", methods=["GET"])
+def get_config():
+    """Expose non-sensitive config (Steam ID) to the frontend."""
+    return jsonify({"steam_id": STEAM_ID})
 
 
 @app.route("/api/user", methods=["GET"])
@@ -48,12 +59,21 @@ def friends_list():
         return jsonify({"error": "steam_id is required"}), 400
     try:
         friends_raw = steam.users.get_user_friends_list(steam_id).get("friends", [])
-        friends = []
-        for f in friends_raw:
-            sid = f.get("steamid")
-            details = steam.users.get_user_details(sid).get("player", {})
-            friends.append(_format_player(details))
-        return jsonify(friends)
+        if not friends_raw:
+            return jsonify([])
+        # Batch-fetch all friend summaries (up to 100 IDs per request)
+        friend_steam_ids = [f.get("steamid") for f in friends_raw if f.get("steamid")]
+        players = []
+        batch_size = 100
+        for i in range(0, len(friend_steam_ids), batch_size):
+            chunk = friend_steam_ids[i:i + batch_size]
+            res = steam.users.get_user_details(",".join(chunk))
+            raw = res.get("players", res.get("player"))
+            if isinstance(raw, list):
+                players.extend(raw)
+            elif isinstance(raw, dict):
+                players.append(raw)
+        return jsonify([_format_player(p) for p in players])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
