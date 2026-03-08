@@ -219,8 +219,8 @@ def steam_deals():
         data = resp.json()
         specials = data.get("specials", {}).get("items", [])
         result = []
-        for item in specials[:12]:          # cap at 12 deals
-            if not item.get("discounted"):
+        for item in specials:               # filter first, then cap
+            if not item.get("discount_percent", 0):
                 continue
             orig = item.get("original_price", 0)
             final = item.get("final_price", 0)
@@ -234,6 +234,8 @@ def steam_deals():
                 "original_price": orig_fmt,
                 "final_price": f"${final / 100:.2f}" if final else "Free",
             })
+            if len(result) >= 12:
+                break
         return jsonify(result)
     except Exception:
         return jsonify([])

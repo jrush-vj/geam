@@ -54,28 +54,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     const id = steamInput.value.trim();
     if (!id) return showError("Please enter a Steam ID.");
     currentSteamId = id;
-    loaded.friends = loaded.recent = loaded.library = false;
+    loaded.home = loaded.friends = loaded.recent = loaded.library = false;
     ownedGamesCache = [];
     await loadProfile(id);
   });
 
   steamInput.addEventListener("keydown", e => e.key === "Enter" && loadBtn.click());
 
-  libraryFilter.addEventListener("input", () => {
-    const q = libraryFilter.value.toLowerCase();
-    renderGameList(
-      "owned-games-list",
-      ownedGamesCache.filter(g => g.name.toLowerCase().includes(q))
-    );
-  });
+  if (libraryFilter) {
+    libraryFilter.addEventListener("input", () => {
+      const q = libraryFilter.value.toLowerCase();
+      renderGameList(
+        "owned-games-list",
+        ownedGamesCache.filter(g => g.name.toLowerCase().includes(q))
+      );
+    });
+  }
 
-  $("game-search-btn").addEventListener("click", runGameSearch);
-  $("game-search-input").addEventListener("keydown", e => e.key === "Enter" && runGameSearch());
+  $('game-search-btn').addEventListener('click', runGameSearch);
+  $('game-search-input').addEventListener('keydown', e => e.key === 'Enter' && runGameSearch());
 
-  // Bind all three sets of tab buttons to the same handler
-  document.querySelectorAll(".top-nav-btn, .btab, .snav-btn").forEach(btn =>
+  // Left sidebar nav
+  document.querySelectorAll(".snav").forEach(btn =>
     btn.addEventListener("click", () => switchTab(btn.dataset.tab))
   );
+
+  // "See all" buttons on home dashboard
+  document.querySelectorAll(".see-more-btn").forEach(btn =>
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab))
+  );
+
+  // Theme toggle
+  const themeToggle = $("theme-toggle");
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      const html = document.documentElement;
+      const goingLight = html.dataset.theme !== "light";
+      html.dataset.theme = goingLight ? "light" : "dark";
+      $("icon-moon").classList.toggle("hidden", goingLight);
+      $("icon-sun").classList.toggle("hidden",  !goingLight);
+    });
+  }
+
+  // Right-sidebar data (no Steam ID needed)
+  loadFreeGames();
+  loadSteamDeals();
+  startQuoteRotation();
 });
 
 // ── API helper ────────────────────────────────────────────────────
@@ -323,44 +347,6 @@ function renderSteamDeals(deals, container) {
   container.appendChild(frag);
 }
 
-// ── Steam Deals ───────────────────────────────────────────────────
-async function loadSteamDeals() {
-  const container = $("steam-deals-list");
-  if (!container) return;
-  try {
-    const deals = await apiFetch("/api/steam-deals");
-    renderSteamDeals(deals, container);
-  } catch {
-    container.innerHTML = `<div class="rs-error">Could not load deals.</div>`;
-  }
-}
-
-function renderSteamDeals(deals, container) {
-  container.innerHTML = "";
-  if (!deals.length) {
-    container.innerHTML = `<div class="rs-placeholder">No deals right now.</div>`;
-    return;
-  }
-  const frag = document.createDocumentFragment();
-  deals.forEach(d => {
-    const a = document.createElement("a");
-    a.className = "rs-game-card";
-    a.href = d.url || "#";
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.innerHTML = `
-      <img class="rs-thumb" src="${escHtml(d.thumbnail || '')}" alt=""
-           onerror="this.style.display='none'" loading="lazy" />
-      <div class="rs-game-info">
-        <div class="rs-game-title">${escHtml(d.title)}</div>
-        <span class="rs-badge-deal">-${escHtml(String(d.discount))}%</span>
-        <span class="rs-price-orig">${escHtml(d.original_price || '')}</span>
-      </div>`;
-    frag.appendChild(a);
-  });
-  container.appendChild(frag);
-}
-
 // ── Free Games ────────────────────────────────────────────────────
 async function loadFreeGames() {
   const container = $("free-games-list");
@@ -376,22 +362,22 @@ async function loadFreeGames() {
 function renderFreeGames(games, container) {
   container.innerHTML = "";
   if (!games.length) {
-    container.innerHTML = `<div class="rs-loading">No free promotions right now.</div>`;
+    container.innerHTML = `<div class="rs-placeholder">No free promotions right now.</div>`;
     return;
   }
   const frag = document.createDocumentFragment();
   games.forEach(g => {
     const a = document.createElement("a");
-    a.className = "free-game-card";
+    a.className = "rs-game-card";
     a.href = g.url || "#";
     a.target = "_blank";
     a.rel = "noopener noreferrer";
     a.innerHTML = `
-      <img class="free-game-thumb" src="${escHtml(g.thumbnail || '')}" alt=""
+      <img class="rs-thumb" src="${escHtml(g.thumbnail || '')}" alt=""
            onerror="this.style.display='none'" loading="lazy" />
-      <div class="free-game-info">
-        <div class="free-game-title">${escHtml(g.title)}</div>
-        <span class="free-game-badge">${escHtml(g.source || 'FREE')}</span>
+      <div class="rs-game-info">
+        <div class="rs-game-title">${escHtml(g.title)}</div>
+        <span class="rs-badge-free">FREE</span>
       </div>`;
     frag.appendChild(a);
   });
