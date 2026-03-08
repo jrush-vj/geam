@@ -98,16 +98,13 @@ function setLoading(on) { spinner.classList.toggle("hidden", !on); }
 
 // ── Tab switching ─────────────────────────────────────────────────
 function switchTab(tab) {
-  // Sync all button groups
-  document.querySelectorAll(".top-nav-btn, .btab, .snav-btn").forEach(b => {
+  document.querySelectorAll(".snav").forEach(b => {
     b.classList.toggle("active", b.dataset.tab === tab);
   });
-  // Show/hide panes
   document.querySelectorAll(".tab-pane").forEach(p => {
     p.classList.toggle("hidden", p.id !== `tab-${tab}`);
     p.classList.toggle("active", p.id === `tab-${tab}`);
   });
-  // Lazy-load data for the activated tab
   if (currentSteamId) onTabActivate(tab);
 }
 
@@ -125,6 +122,9 @@ async function loadProfile(steamId) {
   try {
     const p = await apiFetch(`/api/user?steam_id=${encodeURIComponent(steamId)}`);
     renderProfile(p);
+    // Hide pre-load hint, show main layout
+    const preLoad = $("pre-load");
+    if (preLoad) preLoad.classList.add("hidden");
     mainLayout.classList.remove("hidden");
     switchTab("home");
     await loadHomeDashboard();
@@ -137,36 +137,25 @@ async function loadProfile(steamId) {
 
 function renderProfile(p) {
   const stateLabel = personaStateLabel(p.state);
-  const stateClass = personaStateClass(p.state);
 
-  // Sidebar
-  $("profile-avatar").src = p.avatar;
-  $("profile-name").textContent = p.name;
-  $("profile-state").textContent = stateLabel;
-  $("profile-state").className = `status-badge ${stateClass}`;
-  $("avatar-state-ring").className = `avatar-ring ${stateClass.replace("status-", "")}`;
-  $("profile-country").textContent = p.country ? `🌍 ${p.country}` : "";
-  $("profile-logoff").textContent = p.last_logoff ? `Last seen: ${p.last_logoff}` : "";
-  $("profile-url").href = p.profile_url;
+  // Left sidebar
+  $('profile-avatar').src = p.avatar;
+  $('profile-name').textContent = p.name;
+  $('profile-state').textContent = stateLabel;
+  $('profile-url').href = p.profile_url;
 
-  // Banner
-  $("banner-avatar").src = p.avatar;
-  $("banner-name").textContent = p.name;
-  $("banner-state").textContent = stateLabel;
-  $("banner-state").className = `status-badge banner-badge ${stateClass}`;
+  // Topbar
+  $('header-username').textContent = p.name;
 
-  // Header username
-  $("header-username").textContent = p.name;
-
-  // Hero section username
-  const heroEl = $("hero-username");
+  // Hero greeting
+  const heroEl = $('hero-username');
   if (heroEl) heroEl.textContent = p.name;
 
-  // Hero background — use avatar as ambient fallback (replaced later by game art)
-  const heroBg = $("home-hero-bg");
+  // Hero background – show avatar as fallback (replaced by game art later)
+  const heroBg = $('hero-bg');
   if (heroBg && p.avatar) {
     heroBg.style.backgroundImage = `url('${p.avatar}')`;
-    heroBg.classList.add("loaded");
+    heroBg.classList.add('loaded');
   }
 }
 
@@ -189,7 +178,7 @@ async function loadHomeDashboard() {
     renderCoversGrid(games);
     // Use first game's header art as hero background
     if (games.length) {
-      const heroBg = $("home-hero-bg");
+      const heroBg = $("hero-bg");
       const imgUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${games[0].appid}/header.jpg`;
       const img = new Image();
       img.onload = () => {
@@ -294,6 +283,82 @@ function startQuoteRotation() {
   showQuote();
   if (_quoteTimer) clearInterval(_quoteTimer);
   _quoteTimer = setInterval(showQuote, 8000);
+}
+
+// ── Steam Deals ───────────────────────────────────────────────────
+async function loadSteamDeals() {
+  const container = $("steam-deals-list");
+  if (!container) return;
+  try {
+    const deals = await apiFetch("/api/steam-deals");
+    renderSteamDeals(deals, container);
+  } catch {
+    container.innerHTML = `<div class="rs-error">Could not load deals.</div>`;
+  }
+}
+
+function renderSteamDeals(deals, container) {
+  container.innerHTML = "";
+  if (!deals.length) {
+    container.innerHTML = `<div class="rs-placeholder">No deals right now.</div>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  deals.forEach(d => {
+    const a = document.createElement("a");
+    a.className = "rs-game-card";
+    a.href = d.url || "#";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.innerHTML = `
+      <img class="rs-thumb" src="${escHtml(d.thumbnail || '')}" alt=""
+           onerror="this.style.display='none'" loading="lazy" />
+      <div class="rs-game-info">
+        <div class="rs-game-title">${escHtml(d.title)}</div>
+        <span class="rs-badge-deal">-${escHtml(String(d.discount))}%</span>
+        <span class="rs-price-orig">${escHtml(d.original_price || '')}</span>
+      </div>`;
+    frag.appendChild(a);
+  });
+  container.appendChild(frag);
+}
+
+// ── Steam Deals ───────────────────────────────────────────────────
+async function loadSteamDeals() {
+  const container = $("steam-deals-list");
+  if (!container) return;
+  try {
+    const deals = await apiFetch("/api/steam-deals");
+    renderSteamDeals(deals, container);
+  } catch {
+    container.innerHTML = `<div class="rs-error">Could not load deals.</div>`;
+  }
+}
+
+function renderSteamDeals(deals, container) {
+  container.innerHTML = "";
+  if (!deals.length) {
+    container.innerHTML = `<div class="rs-placeholder">No deals right now.</div>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  deals.forEach(d => {
+    const a = document.createElement("a");
+    a.className = "rs-game-card";
+    a.href = d.url || "#";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.innerHTML = `
+      <img class="rs-thumb" src="${escHtml(d.thumbnail || '')}" alt=""
+           onerror="this.style.display='none'" loading="lazy" />
+      <div class="rs-game-info">
+        <div class="rs-game-title">${escHtml(d.title)}</div>
+        <span class="rs-badge-deal">-${escHtml(String(d.discount))}%</span>
+        <span class="rs-price-orig">${escHtml(d.original_price || '')}</span>
+      </div>`;
+    frag.appendChild(a);
+  });
+  container.appendChild(frag);
 }
 
 // ── Free Games ────────────────────────────────────────────────────

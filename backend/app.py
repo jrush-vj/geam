@@ -199,6 +199,46 @@ def game_details():
         return jsonify({"error": str(e)}), 500
 
 
+_STEAM_FEATURED_URL = "https://store.steampowered.com/api/featuredcategories/"
+
+
+@app.route("/api/steam-deals", methods=["GET"])
+def steam_deals():
+    """
+    Returns featured discounted games from the Steam store.
+    Uses Steam's public featuredcategories API — no key required.
+    Falls back to an empty list on any error.
+    """
+    try:
+        resp = requests.get(
+            _STEAM_FEATURED_URL,
+            params={"cc": "US", "l": "english"},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        specials = data.get("specials", {}).get("items", [])
+        result = []
+        for item in specials[:12]:          # cap at 12 deals
+            if not item.get("discounted"):
+                continue
+            orig = item.get("original_price", 0)
+            final = item.get("final_price", 0)
+            orig_fmt = f"${orig / 100:.2f}" if orig else ""
+            appid = item.get("id", 0)
+            result.append({
+                "title": item.get("name", ""),
+                "thumbnail": item.get("small_capsule_image", ""),
+                "url": f"https://store.steampowered.com/app/{appid}/",
+                "discount": item.get("discount_percent", 0),
+                "original_price": orig_fmt,
+                "final_price": f"${final / 100:.2f}" if final else "Free",
+            })
+        return jsonify(result)
+    except Exception:
+        return jsonify([])
+
+
 _EPIC_FREE_URL = (
     "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
     "?locale=en-US&country=US&allowCountries=US"

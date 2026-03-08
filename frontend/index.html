@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,37 +9,25 @@
 <body>
   <div class="app-window">
 
-    <!-- ── Title / Nav Bar ──────────────────────────────────────── -->
-    <header class="title-bar">
-      <div class="title-bar-left">
-        <span class="steam-wordmark">GEAM</span>
-        <nav class="top-nav">
-          <button class="top-nav-btn" data-tab="home">HOME</button>
-          <button class="top-nav-btn" data-tab="friends">COMMUNITY</button>
-          <button class="top-nav-btn" data-tab="recently-played">RECENT GAMES</button>
-          <button class="top-nav-btn" data-tab="owned-games">LIBRARY</button>
-          <button class="top-nav-btn" data-tab="search">STORE</button>
-        </nav>
+    <!-- Topbar -->
+    <header class="topbar">
+      <span class="topbar-logo">GEAM</span>
+      <div class="topbar-search">
+        <input id="steam-id-input" type="text" placeholder="Enter Steam ID…" class="id-input" />
+        <button id="load-btn" class="btn-load">Load</button>
       </div>
-      <div class="title-bar-right">
-        <span id="header-username" class="header-username"></span>
-        <div class="window-controls">
-          <span class="wc-btn wc-min">─</span>
-          <span class="wc-btn wc-max">□</span>
-          <span class="wc-btn wc-close">✕</span>
-        </div>
+      <div class="topbar-right">
+        <span id="header-username" class="topbar-username"></span>
+        <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
+          <svg id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hidden"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
       </div>
     </header>
 
-    <!-- ── Sub-Bar (breadcrumb + search) ────────────────────────── -->
-    <div class="sub-bar">
-      <div class="sub-bar-inner">
-        <span class="sub-label">Steam Profile Viewer</span>
-        <div class="id-row">
-          <input id="steam-id-input" type="text" placeholder="Enter Steam ID…" class="id-input" />
-          <button id="load-btn" class="btn-primary">View Profile</button>
-        </div>
-      </div>
+    <!-- Pre-load hint -->
+    <div id="pre-load" class="pre-load">
+      <p class="pre-load-hint">Enter your Steam ID above to load your profile</p>
     </div>
 
     <!-- ── Error banner ─────────────────────────────────────────── -->
@@ -53,125 +41,90 @@
     <!-- ── Main Layout ──────────────────────────────────────────── -->
     <div id="main-layout" class="main-layout hidden">
 
-      <!-- Left Sidebar -->
-      <aside class="sidebar">
-        <div class="profile-card">
-          <div class="avatar-frame">
-            <img id="profile-avatar" src="" alt="Avatar" class="profile-avatar" />
-            <span id="avatar-state-ring" class="avatar-ring"></span>
-          </div>
-          <div class="profile-meta">
-            <p id="profile-name" class="profile-display-name"></p>
-            <span id="profile-state" class="status-badge"></span>
-            <p id="profile-country" class="profile-detail"></p>
-            <p id="profile-logoff" class="profile-detail muted"></p>
-            <a id="profile-url" href="#" target="_blank" class="profile-link">View on Steam ↗</a>
+      <!-- Left Sidebar — Navigation -->
+      <aside class="sidebar-left">
+        <div class="sidebar-profile">
+          <img id="profile-avatar" src="" alt="" class="sidebar-avatar" />
+          <div>
+            <div id="profile-name" class="sidebar-name"></div>
+            <div id="profile-state" class="sidebar-state"></div>
           </div>
         </div>
-
         <nav class="sidebar-nav">
-          <button class="snav-btn active" data-tab="home">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5L1 7h2v7h4v-4h2v4h4V7h2L8 1.5z"/></svg>
+          <button class="snav active" data-tab="home">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 0 0-1.414 0l-7 7A1 1 0 0 0 3 11h1v6a1 1 0 0 0 1 1h4v-4h2v4h4a1 1 0 0 0 1-1v-6h1a1 1 0 0 0 .707-1.707l-7-7z"/></svg>
             Home
           </button>
-          <button class="snav-btn" data-tab="friends">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm5 5H3a5 5 0 0 1 10 0z"/></svg>
+          <button class="snav" data-tab="friends">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM17 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 0 0-1.5-4.33A5 5 0 0 1 19 16v1h-6.07zM6 11a5 5 0 0 1 5 5v1H1v-1a5 5 0 0 1 5-5z"/></svg>
             Friends
           </button>
-          <button class="snav-btn" data-tab="recently-played">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm4 3v5l4-2.5L7 5z"/></svg>
-            Recent Games
+          <button class="snav" data-tab="recently-played">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM9.555 7.168A1 1 0 0 0 8 8v4a1 1 0 0 0 1.555.832l3-2a1 1 0 0 0 0-1.664l-3-2z" clip-rule="evenodd"/></svg>
+            Recent
           </button>
-          <button class="snav-btn" data-tab="owned-games">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1V3zm2 4h10v2H3V7zm2 4h6v2H5v-2z"/></svg>
+          <button class="snav" data-tab="owned-games">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2H7zM4 7a1 1 0 0 1 1-1h10a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zM2 11a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4z"/></svg>
             Library
           </button>
-          <button class="snav-btn" data-tab="search">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.415l-3.868-3.833zm-5.242 1.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
-            Search Store
+          <button class="snav" data-tab="search">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM2 8a6 6 0 1 1 10.89 3.476l4.817 4.817a1 1 0 0 1-1.414 1.414l-4.816-4.816A6 6 0 0 1 2 8z" clip-rule="evenodd"/></svg>
+            Search
           </button>
         </nav>
+        <a id="profile-url" href="#" target="_blank" class="sidebar-steam-link">View on Steam ↗</a>
       </aside>
 
-      <!-- Content Area -->
-      <main class="content-area">
+      <!-- Main Content -->
+      <main class="main-content">
 
-        <!-- Profile banner -->
-        <div class="profile-banner">
-          <div class="banner-inner">
-            <img id="banner-avatar" src="" alt="" class="banner-avatar" />
-            <div class="banner-info">
-              <h1 id="banner-name" class="banner-name"></h1>
-              <span id="banner-state" class="status-badge banner-badge"></span>
-            </div>
-          </div>
-          <div class="banner-tabs">
-            <button class="btab active" data-tab="home">HOME</button>
-            <button class="btab" data-tab="friends">FRIENDS</button>
-            <button class="btab" data-tab="recently-played">RECENT GAMES</button>
-            <button class="btab" data-tab="owned-games">GAMES</button>
-            <button class="btab" data-tab="search">SEARCH</button>
-          </div>
-        </div>
-
-        <!-- Tab: Home (Dashboard) -->
+        <!-- Tab: Home -->
         <div id="tab-home" class="tab-pane active">
 
-          <!-- Hero Section -->
-          <div class="home-hero">
-            <div id="home-hero-bg" class="home-hero-bg"></div>
-            <div class="home-hero-overlay"></div>
-            <div class="home-hero-content">
-              <h1 class="home-greeting">Hi, <span id="hero-username">Player</span></h1>
-              <p class="home-quote" id="hero-quote"></p>
-              <span class="home-quote-source" id="hero-quote-source"></span>
+          <!-- Hero -->
+          <div class="hero">
+            <div id="hero-bg" class="hero-bg"></div>
+            <div class="hero-overlay"></div>
+            <div class="hero-body">
+              <h1 class="hero-greeting">Hi, <span id="hero-username">Player</span></h1>
+              <p class="hero-quote" id="hero-quote"></p>
+              <span class="hero-quote-src" id="hero-quote-source"></span>
             </div>
           </div>
 
-          <!-- Stats Row -->
-          <div class="stats-row">
-            <div class="stat-item">
-              <span class="stat-dot dot-played"></span>
-              <div class="stat-info">
-                <div class="stat-label">Played</div>
-                <div class="stat-value" id="stat-played">—</div>
-              </div>
+          <!-- Stats -->
+          <div class="stats-bar">
+            <div class="stat">
+              <div class="stat-dot c-played"></div>
+              <div><div class="stat-label">Played</div><div class="stat-val" id="stat-played">—</div></div>
             </div>
-            <div class="stat-item">
-              <span class="stat-dot dot-backlog"></span>
-              <div class="stat-info">
-                <div class="stat-label">Backlog</div>
-                <div class="stat-value" id="stat-backlog">—</div>
-              </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-dot c-backlog"></div>
+              <div><div class="stat-label">Backlog</div><div class="stat-val" id="stat-backlog">—</div></div>
             </div>
-            <div class="stat-item">
-              <span class="stat-dot dot-recent"></span>
-              <div class="stat-info">
-                <div class="stat-label">Recent</div>
-                <div class="stat-value" id="stat-recent">—</div>
-              </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-dot c-recent"></div>
+              <div><div class="stat-label">Recent</div><div class="stat-val" id="stat-recent">—</div></div>
             </div>
-            <div class="stat-item">
-              <span class="stat-dot dot-friends"></span>
-              <div class="stat-info">
-                <div class="stat-label">Friends Online</div>
-                <div class="stat-value" id="stat-friends">—</div>
-              </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-dot c-friends"></div>
+              <div><div class="stat-label">Online</div><div class="stat-val" id="stat-friends">—</div></div>
             </div>
-            <div class="stat-item">
-              <span class="stat-dot dot-library"></span>
-              <div class="stat-info">
-                <div class="stat-label">Library</div>
-                <div class="stat-value" id="stat-library">—</div>
-              </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-dot c-library"></div>
+              <div><div class="stat-label">Library</div><div class="stat-val" id="stat-library">—</div></div>
             </div>
           </div>
 
-          <!-- Recently Played Covers -->
+          <!-- Recently Played -->
           <div class="home-section">
             <div class="home-section-hdr">
-              <h2 class="section-title">Recently Played</h2>
-              <button class="see-more-btn" data-tab="recently-played">See More</button>
+              <span class="home-section-label">Recently Played</span>
+              <button class="link-btn see-more-btn" data-tab="recently-played">See all →</button>
             </div>
             <div id="home-covers-grid" class="covers-grid"></div>
           </div>
@@ -180,36 +133,30 @@
 
         <!-- Tab: Friends -->
         <div id="tab-friends" class="tab-pane hidden">
-          <div class="section-header">
-            <h2 class="section-title">Friends</h2>
-            <span id="friends-count" class="count-chip"></span>
+          <div class="tab-header">
+            <h2 class="tab-title">Friends <span id="friends-count" class="chip"></span></h2>
           </div>
           <div id="friends-list" class="friends-grid"></div>
         </div>
 
         <!-- Tab: Recently Played -->
         <div id="tab-recently-played" class="tab-pane hidden">
-          <div class="section-header">
-            <h2 class="section-title">Recently Played</h2>
-          </div>
+          <div class="tab-header"><h2 class="tab-title">Recently Played</h2></div>
           <div id="recently-played-list" class="game-list"></div>
         </div>
 
-        <!-- Tab: Owned Games -->
+        <!-- Tab: Library -->
         <div id="tab-owned-games" class="tab-pane hidden">
-          <div class="section-header">
-            <h2 class="section-title">Library</h2>
-            <span id="owned-count" class="count-chip"></span>
+          <div class="tab-header">
+            <h2 class="tab-title">Library <span id="owned-count" class="chip"></span></h2>
+            <input id="library-filter" type="text" placeholder="Filter games…" class="filter-input" />
           </div>
-          <input id="library-filter" type="text" placeholder="Filter games…" class="filter-input" />
           <div id="owned-games-list" class="game-list"></div>
         </div>
 
         <!-- Tab: Search -->
         <div id="tab-search" class="tab-pane hidden">
-          <div class="section-header">
-            <h2 class="section-title">Search Store</h2>
-          </div>
+          <div class="tab-header"><h2 class="tab-title">Search Store</h2></div>
           <div class="search-row">
             <input id="game-search-input" type="text" placeholder="Search for a game…" class="id-input" />
             <button id="game-search-btn" class="btn-primary">Search</button>
@@ -221,32 +168,17 @@
       </main>
 
       <!-- Right Sidebar -->
-      <aside class="right-sidebar">
-        <div class="rs-section">
-          <div class="rs-section-title">🎮 Free Right Now</div>
-          <div id="free-games-list" class="free-games-list">
-            <div class="rs-loading">Fetching free games…</div>
+      <aside class="sidebar-right">
+        <div class="rs-block">
+          <div class="rs-label">Free on Steam</div>
+          <div id="free-games-list" class="rs-list">
+            <div class="rs-placeholder">Loading…</div>
           </div>
         </div>
-        <div class="rs-section">
-          <div class="rs-section-title">📝 Developer Blog</div>
-          <div class="blog-posts">
-            <a class="blog-post" href="#" target="_blank">
-              <div class="blog-title">GEAM v1.0 — Track your Steam library like never before</div>
-              <div class="blog-date">Mar 8, 2026</div>
-            </a>
-            <a class="blog-post" href="#" target="_blank">
-              <div class="blog-title">Free Games dashboard is now live</div>
-              <div class="blog-date">Mar 1, 2026</div>
-            </a>
-            <a class="blog-post" href="#" target="_blank">
-              <div class="blog-title">Epic Games integration &amp; new stats page</div>
-              <div class="blog-date">Feb 22, 2026</div>
-            </a>
-            <a class="blog-post" href="#" target="_blank">
-              <div class="blog-title">Introducing GEAM — Your ultimate game dashboard</div>
-              <div class="blog-date">Feb 8, 2026</div>
-            </a>
+        <div class="rs-block">
+          <div class="rs-label">Steam Deals</div>
+          <div id="steam-deals-list" class="rs-list">
+            <div class="rs-placeholder">Loading…</div>
           </div>
         </div>
       </aside>
