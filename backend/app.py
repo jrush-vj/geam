@@ -199,6 +199,61 @@ def game_details():
         return jsonify({"error": str(e)}), 500
 
 
+_EPIC_FREE_URL = (
+    "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
+    "?locale=en-US&country=US&allowCountries=US"
+)
+
+
+@app.route("/api/free-games", methods=["GET"])
+def free_games():
+    """
+    Returns currently free games from the Epic Games Store.
+    Falls back to an empty list on any network/parse error so the
+    frontend never shows a hard failure.
+    """
+    try:
+        resp = requests.get(_EPIC_FREE_URL, timeout=8)
+        resp.raise_for_status()
+        elements = (
+            resp.json()
+            .get("data", {})
+            .get("Catalog", {})
+            .get("searchStore", {})
+            .get("elements", [])
+        )
+        result = []
+        for el in elements:
+            promos = el.get("promotions") or {}
+            current = promos.get("promotionalOffers", [])
+            # A game is currently free when it has at least one active
+            # promotional offer whose discountPercentage == 0 (i.e. 100 % off)
+            is_free = any(
+                offer.get("discountSetting", {}).get("discountPercentage", -1) == 0
+                for promo in current
+                for offer in promo.get("promotionalOffers", [])
+            )
+            if not is_free:
+                continue
+            # Pick the best available thumbnail (wide keyart preferred)
+            thumb = ""
+            for img in el.get("keyImages", []):
+                if img.get("type") in ("OfferImageWide", "Thumbnail", "DieselStoreFrontWide"):
+                    thumb = img.get("url", "")
+                    break
+            slug = el.get("catalogNs", {}).get("mappings", [{}])[0].get("pageSlug", "")
+            url = f"https://store.epicgames.com/en-US/p/{slug}" if slug else "https://store.epicgames.com/en-US/free-games"
+            result.append({
+                "title": el.get("title", ""),
+                "thumbnail": thumb,
+                "url": url,
+                "source": "EPIC",
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify([])
+
+
 if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
     app.run(debug=debug, port=5000)
