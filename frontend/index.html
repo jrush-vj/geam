@@ -14,7 +14,8 @@
       <div class="title-bar-left">
         <span class="steam-wordmark">GEAM</span>
         <nav class="top-nav">
-          <button class="top-nav-btn active" data-tab="friends">COMMUNITY</button>
+          <button class="top-nav-btn" data-tab="home">HOME</button>
+          <button class="top-nav-btn" data-tab="friends">COMMUNITY</button>
           <button class="top-nav-btn" data-tab="recently-played">RECENT GAMES</button>
           <button class="top-nav-btn" data-tab="owned-games">LIBRARY</button>
           <button class="top-nav-btn" data-tab="search">STORE</button>
@@ -69,7 +70,11 @@
         </div>
 
         <nav class="sidebar-nav">
-          <button class="snav-btn active" data-tab="friends">
+          <button class="snav-btn active" data-tab="home">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5L1 7h2v7h4v-4h2v4h4V7h2L8 1.5z"/></svg>
+            Home
+          </button>
+          <button class="snav-btn" data-tab="friends">
             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm5 5H3a5 5 0 0 1 10 0z"/></svg>
             Friends
           </button>
@@ -101,15 +106,80 @@
             </div>
           </div>
           <div class="banner-tabs">
-            <button class="btab active" data-tab="friends">FRIENDS</button>
+            <button class="btab active" data-tab="home">HOME</button>
+            <button class="btab" data-tab="friends">FRIENDS</button>
             <button class="btab" data-tab="recently-played">RECENT GAMES</button>
             <button class="btab" data-tab="owned-games">GAMES</button>
             <button class="btab" data-tab="search">SEARCH</button>
           </div>
         </div>
 
+        <!-- Tab: Home (Dashboard) -->
+        <div id="tab-home" class="tab-pane active">
+
+          <!-- Hero Section -->
+          <div class="home-hero">
+            <div id="home-hero-bg" class="home-hero-bg"></div>
+            <div class="home-hero-overlay"></div>
+            <div class="home-hero-content">
+              <h1 class="home-greeting">Hi, <span id="hero-username">Player</span></h1>
+              <p class="home-quote" id="hero-quote"></p>
+              <span class="home-quote-source" id="hero-quote-source"></span>
+            </div>
+          </div>
+
+          <!-- Stats Row -->
+          <div class="stats-row">
+            <div class="stat-item">
+              <span class="stat-dot dot-played"></span>
+              <div class="stat-info">
+                <div class="stat-label">Played</div>
+                <div class="stat-value" id="stat-played">—</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-dot dot-backlog"></span>
+              <div class="stat-info">
+                <div class="stat-label">Backlog</div>
+                <div class="stat-value" id="stat-backlog">—</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-dot dot-recent"></span>
+              <div class="stat-info">
+                <div class="stat-label">Recent</div>
+                <div class="stat-value" id="stat-recent">—</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-dot dot-friends"></span>
+              <div class="stat-info">
+                <div class="stat-label">Friends Online</div>
+                <div class="stat-value" id="stat-friends">—</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-dot dot-library"></span>
+              <div class="stat-info">
+                <div class="stat-label">Library</div>
+                <div class="stat-value" id="stat-library">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recently Played Covers -->
+          <div class="home-section">
+            <div class="home-section-hdr">
+              <h2 class="section-title">Recently Played</h2>
+              <button class="see-more-btn" data-tab="recently-played">See More</button>
+            </div>
+            <div id="home-covers-grid" class="covers-grid"></div>
+          </div>
+
+        </div><!-- /tab-home -->
+
         <!-- Tab: Friends -->
-        <div id="tab-friends" class="tab-pane active">
+        <div id="tab-friends" class="tab-pane hidden">
           <div class="section-header">
             <h2 class="section-title">Friends</h2>
             <span id="friends-count" class="count-chip"></span>
@@ -149,6 +219,38 @@
         </div>
 
       </main>
+
+      <!-- Right Sidebar -->
+      <aside class="right-sidebar">
+        <div class="rs-section">
+          <div class="rs-section-title">🎮 Free Right Now</div>
+          <div id="free-games-list" class="free-games-list">
+            <div class="rs-loading">Fetching free games…</div>
+          </div>
+        </div>
+        <div class="rs-section">
+          <div class="rs-section-title">📝 Developer Blog</div>
+          <div class="blog-posts">
+            <a class="blog-post" href="#" target="_blank">
+              <div class="blog-title">GEAM v1.0 — Track your Steam library like never before</div>
+              <div class="blog-date">Mar 8, 2026</div>
+            </a>
+            <a class="blog-post" href="#" target="_blank">
+              <div class="blog-title">Free Games dashboard is now live</div>
+              <div class="blog-date">Mar 1, 2026</div>
+            </a>
+            <a class="blog-post" href="#" target="_blank">
+              <div class="blog-title">Epic Games integration &amp; new stats page</div>
+              <div class="blog-date">Feb 22, 2026</div>
+            </a>
+            <a class="blog-post" href="#" target="_blank">
+              <div class="blog-title">Introducing GEAM — Your ultimate game dashboard</div>
+              <div class="blog-date">Feb 8, 2026</div>
+            </a>
+          </div>
+        </div>
+      </aside>
+
     </div><!-- /main-layout -->
   </div><!-- /app-window -->
 
