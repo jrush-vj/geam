@@ -22,7 +22,7 @@ _SUMMARIES_URL = (
 _FRIEND_LIST_URL = "https://api.steampowered.com/ISteamUser/GetFriendList/v1/"
 _OWNED_GAMES_URL = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
 _APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
-MAX_WORKERS = int(os.getenv("STEAM_WORKERS", "40"))
+_MAX_WORKERS = int(os.getenv("LIBRARY_MAX_WORKERS", "40"))
 
 
 # ── helpers ─────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ def _bulk_player_summaries(steam_ids: list[str]) -> list[dict]:
     return results
 
 
-def _get_friends(steam_id: str) -> list[str]:
+def _get_friend_ids(steam_id: str) -> list[str]:
     resp = requests.get(
         _FRIEND_LIST_URL,
         params={"key": KEY, "steamid": steam_id, "relationship": "friend"},
@@ -70,14 +70,14 @@ def _get_friends(steam_id: str) -> list[str]:
     )
     resp.raise_for_status()
     return [
-        f.get("steamid", "")
+        f.get("steamid")
         for f in resp.json().get("friendslist", {}).get("friends", [])
         if f.get("steamid")
     ]
 
 
-def _fetch_owned_games_for(steam_id: str) -> tuple[str, list[dict]]:
-    """Returns (steam_id, owned_games). Private profiles return an empty list."""
+def _fetch_owned_games_for_id(steam_id: str) -> tuple[str, list[dict]]:
+    """Returns (steam_id, games). Returns [] for private profiles/errors."""
     try:
         resp = requests.get(
             _OWNED_GAMES_URL,
@@ -96,8 +96,8 @@ def _fetch_owned_games_for(steam_id: str) -> tuple[str, list[dict]]:
         return steam_id, []
 
 
-def _check_family_sharable(app_id: int) -> tuple[int, bool]:
-    """Return (appid, True) if app has Family Sharing category (id=62)."""
+def _is_family_sharable(app_id: int) -> bool:
+    """Returns True when Steam app category contains Family Sharing (id=62)."""
     try:
         resp = requests.get(
             _APP_DETAILS_URL,
@@ -106,13 +106,26 @@ def _check_family_sharable(app_id: int) -> tuple[int, bool]:
         )
         resp.raise_for_status()
         info = resp.json().get(str(app_id), {})
-        if info.get("success"):
-            categories = info.get("data", {}).get("categories", [])
-            if any(c.get("id") == 62 for c in categories):
-                return app_id, True
+        if not info.get("success"):
+            return False
+        cats = info.get("data", {}).get("categories", [])
+        return any(c.get("id") == 62 for c in cats)
     except Exception:
-        pass
-    return app_id, False
+        return False
+
+
+def _sort_by_name(ids: set[int], names: dict[int, str]) -> list[int]:
+    return sorted(ids, key=lambda aid: names.get(aid, "").casefold())
+
+
+def _to_game_item(app_id: int, meta: dict, source: str) -> dict:
+    return {
+        "appid": app_id,
+        "name": meta.get("name") or str(app_id),
+        "img_icon_url": meta.get("img_icon_url"),
+        "playtime_forever_hrs": round(meta.get("playtime_forever", 0) / 60, 2),
+        "source": source,
+    }
 
 
 # ── routes ──────────────────────────────────────────────────────────────────
@@ -212,96 +225,93 @@ def owned_games():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/library-view", methods=["GET"])
-def library_view():
+@app.route("/api/library-catalog", methods=["GET"])
+def library_catalog():
+    """
+    Fast family-library view:
+    1) get friend IDs (1 call)
+    2) get owned games for self + friends (parallel)
+    3) check family-sharing category for unique app IDs (parallel)
+    """
     steam_id = request.args.get("steam_id", DEFAULT_STEAM_ID).strip()
     if not steam_id:
         return jsonify({"error": "steam_id is required"}), 400
     if not KEY:
-        return jsonify({"error": "STEAM_API_KEY is not configured"}), 500
+        return jsonify({"error": "STEAM_API_KEY is missing"}), 500
 
     try:
-        friend_ids = _get_friends(steam_id)
+        friend_ids = _get_friend_ids(steam_id)
     except Exception as e:
-        return jsonify({"error": f"Could not fetch friends list: {e}"}), 500
+        return jsonify({"error": f"Could not fetch friend list: {e}"}), 500
 
     all_ids = [steam_id] + friend_ids
     my_appids: set[int] = set()
     friend_appids: set[int] = set()
-    all_games_map: dict[int, dict] = {}
-    my_games_map: dict[int, dict] = {}
+    app_names: dict[int, str] = {}
+    app_meta: dict[int, dict] = {}
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        for sid, games in pool.map(_fetch_owned_games_for, all_ids):
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
+        for sid, games in pool.map(_fetch_owned_games_for_id, all_ids):
             for g in games:
-                appid = g.get("appid")
-                if not appid:
+                aid = g.get("appid")
+                if not aid:
                     continue
-                appid = int(appid)
-                name = g.get("name", str(appid))
-                img_icon_url = g.get("img_icon_url")
-                playtime_hrs = round(g.get("playtime_forever", 0) / 60, 2)
-
-                if appid not in all_games_map:
-                    all_games_map[appid] = {
-                        "appid": appid,
-                        "name": name,
-                        "img_icon_url": img_icon_url,
-                        "playtime_forever_hrs": 0,
-                    }
-
+                app_names.setdefault(aid, g.get("name") or str(aid))
+                app_meta.setdefault(
+                    aid,
+                    {
+                        "name": g.get("name") or str(aid),
+                        "img_icon_url": g.get("img_icon_url"),
+                        "playtime_forever": 0,
+                    },
+                )
                 if sid == steam_id:
-                    my_appids.add(appid)
-                    my_games_map[appid] = {
-                        "appid": appid,
-                        "name": name,
-                        "img_icon_url": img_icon_url,
-                        "playtime_forever_hrs": playtime_hrs,
-                    }
-                    all_games_map[appid]["playtime_forever_hrs"] = playtime_hrs
-                    if img_icon_url:
-                        all_games_map[appid]["img_icon_url"] = img_icon_url
+                    my_appids.add(aid)
+                    app_meta[aid]["playtime_forever"] = g.get("playtime_forever", 0)
+                    if g.get("img_icon_url"):
+                        app_meta[aid]["img_icon_url"] = g.get("img_icon_url")
                 else:
-                    friend_appids.add(appid)
-                    if img_icon_url and not all_games_map[appid].get("img_icon_url"):
-                        all_games_map[appid]["img_icon_url"] = img_icon_url
+                    friend_appids.add(aid)
+                    if not app_meta[aid].get("img_icon_url") and g.get("img_icon_url"):
+                        app_meta[aid]["img_icon_url"] = g.get("img_icon_url")
 
     friend_only_appids = friend_appids - my_appids
+
     sharable_ids: set[int] = set()
+    unique_app_ids = list(app_names.keys())
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
+        for aid, is_ok in zip(unique_app_ids, pool.map(_is_family_sharable, unique_app_ids)):
+            if is_ok:
+                sharable_ids.add(aid)
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        for appid, ok in pool.map(_check_family_sharable, list(all_games_map.keys())):
-            if ok:
-                sharable_ids.add(appid)
+    all_games_ids = my_appids | (friend_only_appids & sharable_ids)
+    owned_games_ids = my_appids
+    family_games_ids = friend_only_appids & sharable_ids
 
-    all_list_ids = my_appids | (friend_only_appids & sharable_ids)
-    owned_list_ids = my_appids
-    family_list_ids = friend_only_appids & sharable_ids
-
-    def _build_list(ids: set[int], source: str) -> list[dict]:
-        items = []
-        for aid in ids:
-            if source == "owned":
-                item = my_games_map.get(aid, all_games_map.get(aid, {})).copy()
-            else:
-                item = all_games_map.get(aid, {}).copy()
-            if not item:
-                continue
-            item["source"] = source
-            items.append(item)
-        items.sort(key=lambda x: (x.get("name") or "").casefold())
-        return items
+    all_games = [
+        _to_game_item(aid, app_meta.get(aid, {}), "family_share" if aid in family_games_ids else "owned")
+        for aid in _sort_by_name(all_games_ids, app_names)
+    ]
+    owned_games_list = [
+        _to_game_item(aid, app_meta.get(aid, {}), "owned")
+        for aid in _sort_by_name(owned_games_ids, app_names)
+    ]
+    family_games_list = [
+        _to_game_item(aid, app_meta.get(aid, {}), "family_share")
+        for aid in _sort_by_name(family_games_ids, app_names)
+    ]
 
     return jsonify(
         {
-            "all_games": _build_list(all_list_ids, "all"),
-            "owned_games": _build_list(owned_list_ids, "owned"),
-            "family_sharing_games": _build_list(family_list_ids, "family_sharing"),
             "counts": {
-                "all": len(all_list_ids),
-                "owned": len(owned_list_ids),
-                "family_sharing": len(family_list_ids),
+                "friends": len(friend_ids),
+                "all_games": len(all_games),
+                "owned_games": len(owned_games_list),
+                "family_sharing_games": len(family_games_list),
             },
+            "all_games": all_games,
+            "owned_games": owned_games_list,
+            "family_sharing_games": family_games_list,
         }
     )
 

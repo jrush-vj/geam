@@ -29,6 +29,11 @@ let _quoteTimer = null;
 const loaded = { home: false, friends: false, recent: false, library: false };
 let currentSteamId = "";
 let ownedGamesCache = [];   // kept for O(n) client-side filter
+const libraryDataCache = {
+  all_games: [],
+  owned_games: [],
+  family_sharing_games: [],
+};
 
 // ── DOM refs ──────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -38,9 +43,7 @@ const errorBanner   = $("error-banner");
 const spinner       = $("global-spinner");
 const mainLayout    = $("main-layout");
 const libraryFilter = $("library-filter");
-const libraryViewMode = $("library-view-mode");
-
-let libraryBuckets = { all: [], owned: [], family: [] };
+const librarySort   = $("library-sort");
 
 // ── Startup ───────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
@@ -59,17 +62,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentSteamId = id;
     loaded.home = loaded.friends = loaded.recent = loaded.library = false;
     ownedGamesCache = [];
+    libraryDataCache.all_games = [];
+    libraryDataCache.owned_games = [];
+    libraryDataCache.family_sharing_games = [];
     await loadProfile(id);
   });
 
   steamInput.addEventListener("keydown", e => e.key === "Enter" && loadBtn.click());
 
   if (libraryFilter) {
-    libraryFilter.addEventListener("input", renderLibraryList);
+    libraryFilter.addEventListener("input", renderSelectedLibrary);
   }
-
-  if (libraryViewMode) {
-    libraryViewMode.addEventListener("change", renderLibraryList);
+  if (librarySort) {
+    librarySort.addEventListener("change", renderSelectedLibrary);
   }
 
   $('game-search-btn').addEventListener('click', runGameSearch);
@@ -137,7 +142,14 @@ async function onTabActivate(tab) {
   if (tab === "home"            && !loaded.home)    await loadHomeDashboard();
   if (tab === "friends"         && !loaded.friends) await loadFriends();
   if (tab === "recently-played" && !loaded.recent)  await loadRecentlyPlayed();
-  if (tab === "owned-games"     && !loaded.library) await loadOwnedGames();
+  if (tab === "owned-games" && (
+    !loaded.library ||
+    (libraryDataCache.all_games.length === 0 &&
+      libraryDataCache.owned_games.length === 0 &&
+      libraryDataCache.family_sharing_games.length === 0)
+  )) {
+    await loadOwnedGames();
+  }
 }
 
 // ── Profile loader ────────────────────────────────────────────────
@@ -217,7 +229,6 @@ async function loadHomeDashboard() {
   // Owned games → played + backlog + library
   if (ownedRes.status === "fulfilled") {
     const data = ownedRes.value;
-    loaded.library = true;
     ownedGamesCache = data.games;
     const total  = data.game_count || data.games.length;
     const played = data.games.filter(g => g.playtime_forever_hrs > 0).length;
@@ -440,15 +451,13 @@ async function loadOwnedGames() {
   setLoading(true);
   clearError();
   try {
-    const data = await apiFetch(`/api/library-view?steam_id=${encodeURIComponent(currentSteamId)}`);
+    const data = await apiFetch(`/api/library-catalog?steam_id=${encodeURIComponent(currentSteamId)}`);
     loaded.library = true;
-    libraryBuckets = {
-      all: data.all_games || [],
-      owned: data.owned_games || [],
-      family: data.family_sharing_games || [],
-    };
-    $("owned-count").textContent = data.counts?.all ?? libraryBuckets.all.length;
-    renderLibraryList();
+    libraryDataCache.all_games = data.all_games || [];
+    libraryDataCache.owned_games = data.owned_games || [];
+    libraryDataCache.family_sharing_games = data.family_sharing_games || [];
+    ownedGamesCache = libraryDataCache.owned_games;
+    renderSelectedLibrary();
   } catch (e) {
     showError("Library: " + e.message);
   } finally {
@@ -456,25 +465,27 @@ async function loadOwnedGames() {
   }
 }
 
-function renderLibraryList() {
-  const mode = libraryViewMode?.value || "all";
-  const query = (libraryFilter?.value || "").trim().toLowerCase();
-  const source = mode === "owned"
-    ? libraryBuckets.owned
-    : mode === "family"
-      ? libraryBuckets.family
-      : libraryBuckets.all;
+function getSelectedLibraryKey() {
+  const v = librarySort?.value || "all";
+  if (v === "owned") return "owned_games";
+  if (v === "family") return "family_sharing_games";
+  return "all_games";
+}
 
-  const filtered = query
-    ? source.filter(g => (g.name || "").toLowerCase().includes(query))
-    : source;
+function renderSelectedLibrary() {
+  const key = getSelectedLibraryKey();
+  const q = (libraryFilter?.value || "").toLowerCase().trim();
+  const list = libraryDataCache[key] || [];
+  const filtered = q
+    ? list.filter(g => (g.name || "").toLowerCase().includes(q))
+    : list;
 
-  renderGameList("owned-games-list", filtered, g => {
-    if (mode === "family" || g.source === "family_sharing") {
-      return "Family Sharing";
-    }
-    return `${g.playtime_forever_hrs ?? 0} hrs`;
-  });
+  $("owned-count").textContent = filtered.length;
+  renderGameList(
+    "owned-games-list",
+    filtered,
+    g => g.source === "family_share" ? "Family Share" : `${g.playtime_forever_hrs} hrs`
+  );
 }
 
 // ── Game list renderer (shared) ───────────────────────────────────

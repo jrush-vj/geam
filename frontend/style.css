@@ -197,6 +197,28 @@ body {
 
 .filter-input { width: 100%; max-width: 360px; margin-bottom: 12px; }
 
+.library-controls {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+.library-sort {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--clr-text);
+  padding: 7px 10px;
+  font-size: 13px;
+  min-width: 220px;
+  outline: none;
+}
+
+.library-sort:focus {
+  border-color: var(--clr-accent);
+}
+
 /* ── Buttons ──────────────────────────────────────────────────── */
 .btn-primary {
   background: linear-gradient(180deg, #6db3dc 0%, #4083ab 100%);

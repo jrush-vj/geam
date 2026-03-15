@@ -149,12 +149,14 @@
         <div id="tab-owned-games" class="tab-pane hidden">
           <div class="tab-header">
             <h2 class="tab-title">Library <span id="owned-count" class="chip"></span></h2>
-            <select id="library-view-mode" class="library-mode-select" aria-label="Library view mode">
-              <option value="all">All Games</option>
-              <option value="owned">Owned Games</option>
-              <option value="family">Family Sharing Games</option>
-            </select>
-            <input id="library-filter" type="text" placeholder="Filter games…" class="filter-input" />
+            <div class="library-controls">
+              <select id="library-sort" class="library-sort" aria-label="Library category">
+                <option value="all">All Games</option>
+                <option value="owned">Owned Games</option>
+                <option value="family">Family Sharing Games</option>
+              </select>
+              <input id="library-filter" type="text" placeholder="Filter games…" class="filter-input" />
+            </div>
           </div>
           <div id="owned-games-list" class="game-list"></div>
         </div>
