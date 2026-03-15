@@ -37,13 +37,13 @@ const libraryDataCache = {
 
 // ── DOM refs ──────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const steamInput    = $("steam-id-input");
-const loadBtn       = $("load-btn");
+const topbarGameSearch = $("topbar-game-search");
 const errorBanner   = $("error-banner");
 const spinner       = $("global-spinner");
 const mainLayout    = $("main-layout");
 const libraryFilter = $("library-filter");
 const librarySort   = $("library-sort");
+const rightSidebar  = $("right-sidebar");
 
 // ── Startup ───────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
@@ -51,24 +51,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const cfg = await apiFetch("/api/config");
     if (cfg.steam_id) {
       currentSteamId = cfg.steam_id;
-      steamInput.value = cfg.steam_id;
       await loadProfile(cfg.steam_id);
+    } else {
+      showError("No default Steam ID found in backend config.");
     }
-  } catch {/* backend not running yet – let user enter manually */ }
-
-  loadBtn.addEventListener("click", async () => {
-    const id = steamInput.value.trim();
-    if (!id) return showError("Please enter a Steam ID.");
-    currentSteamId = id;
-    loaded.home = loaded.friends = loaded.recent = loaded.library = false;
-    ownedGamesCache = [];
-    libraryDataCache.all_games = [];
-    libraryDataCache.owned_games = [];
-    libraryDataCache.family_sharing_games = [];
-    await loadProfile(id);
-  });
-
-  steamInput.addEventListener("keydown", e => e.key === "Enter" && loadBtn.click());
+  } catch {
+    showError("Backend is not reachable. Start backend and refresh.");
+  }
 
   if (libraryFilter) {
     libraryFilter.addEventListener("input", renderSelectedLibrary);
@@ -79,14 +68,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $('game-search-btn').addEventListener('click', runGameSearch);
   $('game-search-input').addEventListener('keydown', e => e.key === 'Enter' && runGameSearch());
+  if (topbarGameSearch) {
+    topbarGameSearch.addEventListener("keydown", async e => {
+      if (e.key !== "Enter") return;
+      const q = topbarGameSearch.value.trim();
+      if (!q) return;
+      $("game-search-input").value = q;
+      switchTab("search");
+      await runGameSearch();
+    });
+  }
 
   // Left sidebar nav
   document.querySelectorAll(".snav").forEach(btn =>
-    btn.addEventListener("click", () => switchTab(btn.dataset.tab))
-  );
-
-  // "See all" buttons on home dashboard
-  document.querySelectorAll(".see-more-btn").forEach(btn =>
     btn.addEventListener("click", () => switchTab(btn.dataset.tab))
   );
 
@@ -135,13 +129,15 @@ function switchTab(tab) {
     p.classList.toggle("hidden", p.id !== `tab-${tab}`);
     p.classList.toggle("active", p.id === `tab-${tab}`);
   });
+  if (rightSidebar) {
+    rightSidebar.classList.toggle("hidden", tab !== "home");
+  }
   if (currentSteamId) onTabActivate(tab);
 }
 
 async function onTabActivate(tab) {
   if (tab === "home"            && !loaded.home)    await loadHomeDashboard();
   if (tab === "friends"         && !loaded.friends) await loadFriends();
-  if (tab === "recently-played" && !loaded.recent)  await loadRecentlyPlayed();
   if (tab === "owned-games" && (
     !loaded.library ||
     (libraryDataCache.all_games.length === 0 &&
@@ -286,7 +282,6 @@ function renderCoversGrid(games) {
       <img src="${imgUrl}" alt="" loading="lazy"
            onerror="this.src='https://store.steampowered.com/public/shared/images/header/globalheader_logo.png'" />
       <div class="cover-label">${escHtml(g.name)}</div>`;
-    card.addEventListener("click", () => switchTab("recently-played"));
     frag.appendChild(card);
   });
   grid.appendChild(frag);

@@ -873,18 +873,20 @@ body {
   font-size: 14px; font-weight: 800; letter-spacing: 2.5px;
   color: var(--accent); text-transform: uppercase; flex-shrink: 0;
 }
-.topbar-search { display: flex; align-items: center; gap: 6px; flex: 1; max-width: 340px; }
+.topbar-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  max-width: 560px;
+  margin: 0 auto;
+}
 .topbar-right  { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .topbar-username {
   font-size: 12px; font-weight: 600; color: var(--text-2);
   max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.btn-load {
-  background: var(--accent); border: none; border-radius: var(--radius-sm);
-  color: #fff; font-size: 12px; font-weight: 700; padding: 7px 16px;
-  cursor: pointer; white-space: nowrap; transition: opacity .15s; flex-shrink: 0;
-}
-.btn-load:hover { opacity: .85; }
 .theme-toggle {
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: var(--radius-sm); color: var(--text-2);

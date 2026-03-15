@@ -13,8 +13,7 @@
     <header class="topbar">
       <span class="topbar-logo">GEAM</span>
       <div class="topbar-search">
-        <input id="steam-id-input" type="text" placeholder="Enter Steam ID…" class="id-input" />
-        <button id="load-btn" class="btn-load">Load</button>
+        <input id="topbar-game-search" type="text" placeholder="Search for games..." class="id-input" />
       </div>
       <div class="topbar-right">
         <span id="header-username" class="topbar-username"></span>
@@ -27,7 +26,7 @@
 
     <!-- Pre-load hint -->
     <div id="pre-load" class="pre-load">
-      <p class="pre-load-hint">Enter your Steam ID above to load your profile</p>
+      <p class="pre-load-hint">Loading profile from backend config...</p>
     </div>
 
     <!-- ── Error banner ─────────────────────────────────────────── -->
@@ -58,10 +57,6 @@
           <button class="snav" data-tab="friends">
             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM17 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 0 0-1.5-4.33A5 5 0 0 1 19 16v1h-6.07zM6 11a5 5 0 0 1 5 5v1H1v-1a5 5 0 0 1 5-5z"/></svg>
             Friends
-          </button>
-          <button class="snav" data-tab="recently-played">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM9.555 7.168A1 1 0 0 0 8 8v4a1 1 0 0 0 1.555.832l3-2a1 1 0 0 0 0-1.664l-3-2z" clip-rule="evenodd"/></svg>
-            Recent
           </button>
           <button class="snav" data-tab="owned-games">
             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2H7zM4 7a1 1 0 0 1 1-1h10a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zM2 11a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4z"/></svg>
@@ -124,7 +119,6 @@
           <div class="home-section">
             <div class="home-section-hdr">
               <span class="home-section-label">Recently Played</span>
-              <button class="link-btn see-more-btn" data-tab="recently-played">See all →</button>
             </div>
             <div id="home-covers-grid" class="covers-grid"></div>
           </div>
@@ -137,12 +131,6 @@
             <h2 class="tab-title">Friends <span id="friends-count" class="chip"></span></h2>
           </div>
           <div id="friends-list" class="friends-grid"></div>
-        </div>
-
-        <!-- Tab: Recently Played -->
-        <div id="tab-recently-played" class="tab-pane hidden">
-          <div class="tab-header"><h2 class="tab-title">Recently Played</h2></div>
-          <div id="recently-played-list" class="game-list"></div>
         </div>
 
         <!-- Tab: Library -->
@@ -175,7 +163,7 @@
       </main>
 
       <!-- Right Sidebar -->
-      <aside class="sidebar-right">
+      <aside id="right-sidebar" class="sidebar-right">
         <div class="rs-block">
           <div class="rs-label">Free on Steam</div>
           <div id="free-games-list" class="rs-list">
