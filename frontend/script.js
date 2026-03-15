@@ -38,6 +38,9 @@ const errorBanner   = $("error-banner");
 const spinner       = $("global-spinner");
 const mainLayout    = $("main-layout");
 const libraryFilter = $("library-filter");
+const libraryViewMode = $("library-view-mode");
+
+let libraryBuckets = { all: [], owned: [], family: [] };
 
 // ── Startup ───────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
@@ -62,13 +65,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   steamInput.addEventListener("keydown", e => e.key === "Enter" && loadBtn.click());
 
   if (libraryFilter) {
-    libraryFilter.addEventListener("input", () => {
-      const q = libraryFilter.value.toLowerCase();
-      renderGameList(
-        "owned-games-list",
-        ownedGamesCache.filter(g => g.name.toLowerCase().includes(q))
-      );
-    });
+    libraryFilter.addEventListener("input", renderLibraryList);
+  }
+
+  if (libraryViewMode) {
+    libraryViewMode.addEventListener("change", renderLibraryList);
   }
 
   $('game-search-btn').addEventListener('click', runGameSearch);
@@ -439,16 +440,41 @@ async function loadOwnedGames() {
   setLoading(true);
   clearError();
   try {
-    const data = await apiFetch(`/api/owned-games?steam_id=${encodeURIComponent(currentSteamId)}`);
+    const data = await apiFetch(`/api/library-view?steam_id=${encodeURIComponent(currentSteamId)}`);
     loaded.library = true;
-    ownedGamesCache = data.games;
-    $("owned-count").textContent = data.game_count;
-    renderGameList("owned-games-list", ownedGamesCache, g => `${g.playtime_forever_hrs} hrs`);
+    libraryBuckets = {
+      all: data.all_games || [],
+      owned: data.owned_games || [],
+      family: data.family_sharing_games || [],
+    };
+    $("owned-count").textContent = data.counts?.all ?? libraryBuckets.all.length;
+    renderLibraryList();
   } catch (e) {
     showError("Library: " + e.message);
   } finally {
     setLoading(false);
   }
+}
+
+function renderLibraryList() {
+  const mode = libraryViewMode?.value || "all";
+  const query = (libraryFilter?.value || "").trim().toLowerCase();
+  const source = mode === "owned"
+    ? libraryBuckets.owned
+    : mode === "family"
+      ? libraryBuckets.family
+      : libraryBuckets.all;
+
+  const filtered = query
+    ? source.filter(g => (g.name || "").toLowerCase().includes(query))
+    : source;
+
+  renderGameList("owned-games-list", filtered, g => {
+    if (mode === "family" || g.source === "family_sharing") {
+      return "Family Sharing";
+    }
+    return `${g.playtime_forever_hrs ?? 0} hrs`;
+  });
 }
 
 // ── Game list renderer (shared) ───────────────────────────────────
