@@ -29,6 +29,7 @@ let _quoteTimer = null;
 const loaded = { home: false, friends: false, recent: false, library: false };
 let currentSteamId = "";
 let ownedGamesCache = [];   // kept for O(n) client-side filter
+let selectedLibraryCategory = "all";
 const libraryDataCache = {
   all_games: [],
   owned_games: [],
@@ -65,6 +66,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (librarySort) {
     librarySort.addEventListener("change", renderSelectedLibrary);
   }
+  document.querySelectorAll(".library-category-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedLibraryCategory = btn.dataset.libraryCategory || "all";
+      document.querySelectorAll(".library-category-btn").forEach(b => {
+        b.classList.toggle("active", b === btn);
+      });
+      renderSelectedLibrary();
+    });
+  });
 
   $('game-search-btn').addEventListener('click', runGameSearch);
   $('game-search-input').addEventListener('keydown', e => e.key === 'Enter' && runGameSearch());
@@ -461,7 +471,7 @@ async function loadOwnedGames() {
 }
 
 function getSelectedLibraryKey() {
-  const v = librarySort?.value || "all";
+  const v = selectedLibraryCategory || "all";
   if (v === "owned") return "owned_games";
   if (v === "family") return "family_sharing_games";
   return "all_games";
@@ -471,21 +481,87 @@ function renderSelectedLibrary() {
   const key = getSelectedLibraryKey();
   const q = (libraryFilter?.value || "").toLowerCase().trim();
   const list = libraryDataCache[key] || [];
-  const filtered = q
-    ? list.filter(g => (g.name || "").toLowerCase().includes(q))
-    : list;
+  const filtered = q ? list.filter(g => (g.name || "").toLowerCase().includes(q)) : list;
 
-  $("owned-count").textContent = filtered.length;
-  renderGameList(
+  const sortMode = librarySort?.value || "alphabetical";
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortMode === "playtime") {
+      return (b.playtime_forever_hrs || 0) - (a.playtime_forever_hrs || 0);
+    }
+    return (a.name || "").localeCompare(b.name || "");
+  });
+
+  $("owned-count").textContent = sorted.length;
+  renderLibraryRail(sorted);
+  renderLibraryGrid(
     "owned-games-list",
-    filtered,
+    sorted,
     g => g.source === "family_share" ? "Family Share" : `${g.playtime_forever_hrs} hrs`
   );
 }
 
-// ── Game list renderer (shared) ───────────────────────────────────
+function renderLibraryRail(games) {
+  const container = $("library-side-list");
+  if (!container) return;
+  container.innerHTML = "";
+  if (!games.length) {
+    container.innerHTML = `<div class="library-empty">No games match the current filter.</div>`;
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  games.slice(0, 40).forEach(g => {
+    const item = document.createElement("div");
+    item.className = "library-side-item";
+    const iconUrl = g.img_icon_url
+      ? `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`
+      : "https://store.steampowered.com/public/shared/images/header/globalheader_logo.png";
+    item.innerHTML = `
+      <img class="library-side-icon" src="${iconUrl}" alt="" loading="lazy" />
+      <div class="library-side-meta">
+        <div class="library-side-name">${escHtml(g.name)}</div>
+        <div class="library-side-subtitle">${g.source === "family_share" ? "Family Share" : `${g.playtime_forever_hrs} hrs played`}</div>
+      </div>`;
+    frag.appendChild(item);
+  });
+  container.appendChild(frag);
+}
+
+function renderLibraryGrid(containerId, games, playtimeFn = g => `${g.playtime_forever_hrs} hrs`) {
+  const container = $(containerId);
+  if (!container) return;
+  container.innerHTML = "";
+  if (!games.length) {
+    container.innerHTML = `<div class="library-empty">No games found.</div>`;
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  games.forEach(g => {
+    const card = document.createElement("div");
+    card.className = "library-card";
+    const coverUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`;
+    const fallbackUrl = g.img_icon_url
+      ? `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`
+      : "https://store.steampowered.com/public/shared/images/header/globalheader_logo.png";
+    card.innerHTML = `
+      <img src="${coverUrl}" alt="" loading="lazy" onerror="this.src='${fallbackUrl}'" />
+      <div class="library-card-overlay">
+        <div class="library-card-title">${escHtml(g.name)}</div>
+        <div class="library-card-meta">
+          <span class="library-card-badge ${g.source === "family_share" ? "family" : ""}">${g.source === "family_share" ? "Family Share" : "Owned"}</span>
+          <span class="library-card-playtime">${escHtml(playtimeFn(g))}</span>
+        </div>
+      </div>`;
+    frag.appendChild(card);
+  });
+  container.appendChild(frag);
+}
+
+// ── Legacy row renderer ──────────────────────────────────────────
 function renderGameList(containerId, games, playtimeFn = g => `${g.playtime_forever_hrs} hrs`) {
   const container = $(containerId);
+  if (!container) return;
   container.innerHTML = "";
   if (!games.length) {
     container.innerHTML = `<p style="color:var(--clr-muted);padding:12px">No games found.</p>`;

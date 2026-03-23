@@ -135,18 +135,43 @@
 
         <!-- Tab: Library -->
         <div id="tab-owned-games" class="tab-pane hidden">
-          <div class="tab-header">
-            <h2 class="tab-title">Library <span id="owned-count" class="chip"></span></h2>
-            <div class="library-controls">
-              <select id="library-sort" class="library-sort" aria-label="Library category">
-                <option value="all">All Games</option>
-                <option value="owned">Owned Games</option>
-                <option value="family">Family Sharing Games</option>
-              </select>
-              <input id="library-filter" type="text" placeholder="Filter games…" class="filter-input" />
-            </div>
+          <div class="library-shell">
+            <aside class="library-rail">
+              <div class="library-rail-head">
+                <div class="library-rail-kicker">My Games</div>
+                <h2 class="library-rail-title">Library <span id="owned-count" class="chip"></span></h2>
+              </div>
+
+              <div class="library-rail-section">
+                <div class="library-rail-label">Collections</div>
+                <button class="library-category-btn active" data-library-category="all">All Games</button>
+                <button class="library-category-btn" data-library-category="owned">Owned Games</button>
+                <button class="library-category-btn" data-library-category="family">Family Sharing Games</button>
+              </div>
+
+              <div class="library-rail-section library-rail-games-wrap">
+                <div class="library-rail-label">Installed / Available</div>
+                <div id="library-side-list" class="library-side-list"></div>
+              </div>
+            </aside>
+
+            <section class="library-main">
+              <div class="tab-header library-header">
+                <div>
+                  <h2 class="tab-title">Library</h2>
+                  <p class="library-subtitle">Steam-style grid view of your collection</p>
+                </div>
+                <div class="library-controls">
+                  <select id="library-sort" class="library-sort" aria-label="Sort library">
+                    <option value="alphabetical">Sort by: Alphabetical</option>
+                    <option value="playtime">Sort by: Playtime</option>
+                  </select>
+                  <input id="library-filter" type="text" placeholder="Filter games…" class="filter-input" />
+                </div>
+              </div>
+              <div id="owned-games-list" class="library-grid"></div>
+            </section>
           </div>
-          <div id="owned-games-list" class="game-list"></div>
         </div>
 
         <!-- Tab: Search -->
